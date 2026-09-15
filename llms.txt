@@ -9,8 +9,9 @@
 - hosting: London, United Kingdom, online 24/7, DDoS protected (TCPShield), no daily restart
 - world: hard mode, keepInventory off, spawn protection 0, random first spawn 100-1000 blocks from 0,0, vanilla world border, map never resets
 - allowed: hacked clients, xray, tnt/rail/carpet/string/sand dupers, bedrock breaking, pearl stasis, griefing, stealing, traps, pvp anywhere, alts
+- finding people: /lfg posts your own coordinates in public chat once (5 minute cooldown) so somebody can walk to you; /coords toggles your own x y z on your action bar. No command shows where another player is.
 - teleports: /sethome (free, overworld only, within 5000 blocks of spawn - no homes in the nether or the end), /home ($25), /tpa ($40, within 1000 blocks), /tpaccept; 10 s warmup; no /rtp, /spawn or /back
-- economy: start with $200; /jobs pays slowly on purpose (a couple of cents per stone block, no daily cap); money only buys teleports; /vote daily reward; /pay, /bal, /baltop
+- economy: start with $200; /jobs pays slowly on purpose (about half a cent per stone block, no daily cap); money only buys teleports; /vote daily reward; /pay, /bal, /baltop
 - voice chat: proximity voice via the Simple Voice Chat mod (Fabric/Forge/NeoForge) - connects automatically when you join, no setup; players without the mod just do not hear it
 - starter: five cookies on first join
 - nether roof sealed at y 127
