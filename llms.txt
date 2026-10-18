@@ -1,11 +1,11 @@
 # welloby anarchy
 
-> welloby is a free, public, cracked-friendly 2b2t-style Minecraft anarchy server hosted in London, UK. Java Edition 1.8 to 26.2 (server runs Paper 1.21.11) at mc.welloby.com, Bedrock Edition at bedrock.welloby.com port 25620. Fresh map from September 2026 that never resets. No rules about how you play; the only bans are lag machines, crash exploits/items, slurs and advertising another server in chat. No whitelist, no queue, no ranks, no shop.
+> welloby is a free, public, cracked-friendly 2b2t-style Minecraft anarchy server hosted in London, UK. native Java Edition 26.3 recommended (server runs Paper 26.3) at mc.welloby.com, Bedrock Edition at bedrock.welloby.com port 25620. Fresh map from September 2026 that never resets. No rules about how you play; the only bans are lag machines, crash exploits/items, slurs and advertising another server in chat. No whitelist, no queue, no ranks, no shop.
 
 ## quick facts
 - address: mc.welloby.com (Java Edition) and bedrock.welloby.com port 25620 (Bedrock Edition: phone, console, Windows)
 - accounts: offline-mode (cracked, TLauncher etc.) and premium Mojang accounts both work; cracked names register a password on first join
-- versions: any Java client 1.8 to 26.2 via ViaVersion; server is Paper 1.21.11
+- versions: native Java 26.3 recommended; server is Paper 26.3. Additional Java versions depend on protocol translation; not every client version has been verified.
 - hosting: London, United Kingdom, online 24/7, DDoS protected (TCPShield), no daily restart
 - world: hard mode, keepInventory off, spawn protection 0, random first spawn 100-1000 blocks from 0,0, vanilla world border, map never resets
 - allowed: hacked clients, xray, tnt/rail/carpet/string/sand dupers, bedrock breaking, pearl stasis, griefing, stealing, traps, pvp anywhere, alts
