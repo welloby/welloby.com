@@ -20,10 +20,12 @@
     let ready = false, timer = 0, tries = 0, last = null;
     const queue = [];
     const post = m => { try { frame.contentWindow.postMessage(m, origin); } catch (e) { /* frame gone */ } };
+    /* the map only answers once it has downloaded about 1.8 MB and started (7 s on a good line), so
+       keep asking for about 90 s for slow phones: every 0.4 s for the first 20 s, then every second */
     function hello() {
       if (ready) return;
       post({ wl: "hello" });
-      if (++tries < 45) timer = setTimeout(hello, 400);
+      if (++tries < 120) timer = setTimeout(hello, tries < 50 ? 400 : 1000);
       else if (onEvent) onEvent({ wl: "timeout" });
     }
     function onMsg(e) {
