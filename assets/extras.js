@@ -214,21 +214,6 @@
     });
   });
 
-  /* ---------- Spawn in 3D: the BlueMap page loads only when asked (only offered for https addresses) ---------- */
-  $$("[data-map3d-load]").forEach(btn => btn.addEventListener("click", () => {
-    const stage = btn.closest("[data-map3d]");
-    if (!stage || stage.querySelector("iframe")) return;
-    const f = document.createElement("iframe");
-    f.src = btn.dataset.map3dLoad;
-    f.title = "Welloby spawn in 3D";
-    f.allow = "fullscreen";
-    f.allowFullscreen = true;
-    f.referrerPolicy = "strict-origin-when-cross-origin";
-    stage.append(f);
-    stage.classList.add("is-live");
-    f.focus();
-  }));
-
   /* ---------- invite and share ---------- */
   const java = (server.java && server.java.host) || "mc.welloby.com";
   const bed = server.bedrock || {};

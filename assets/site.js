@@ -167,15 +167,6 @@
     document.addEventListener("keydown", e => { if (e.key === "Escape" && menu.open) { menu.removeAttribute("open"); $("summary", menu).focus(); } });
   }
 
-  /* ---------- atlas shortcuts placed outside the atlas ---------- */
-  $$("[data-atlas-mode]").forEach(b => b.addEventListener("click", () => {
-    const a = window.wellobyAtlas;
-    const target = $("#atlas");
-    if (target) target.scrollIntoView({ behavior: reduced.matches ? "auto" : "smooth", block: "start" });
-    if (a) a.setMode(b.dataset.atlasMode);
-  }));
-  $$("[data-atlas-roll]").forEach(b => b.addEventListener("click", () => { if (window.wellobyAtlas) window.wellobyAtlas.rollSpawn(); }));
-
   /* ---------- brand kit ---------- */
   if (PREVIEW) {
     document.addEventListener("click", e => {

@@ -249,7 +249,7 @@
       return stash(`<a href="${url}" target="_blank" rel="nofollow ugc noopener noreferrer">${url.replace(/^https?:\/\//, "")}</a>`) + tail;
     });
     s = s.replace(/\b[xX]\s*[:=]?\s*(-?\d{1,7})\s*[,;]?\s*(?:[yY]\s*[:=]?\s*-?\d{1,3}\s*[,;]?\s*)?[zZ]\s*[:=]?\s*(-?\d{1,7})\b/g,
-      (m, x, z) => stash(`<a class="coords" href="index.html#at-x${x}-z${z}" title="Show ${x}, ${z} on the spawn atlas">${m}</a>`));
+      (m, x, z) => stash(`<a class="coords" href="index.html#map-x${x}-z${z}" title="Show ${x}, ${z} on the 3D map">${m}</a>`));
     s = s.replace(/(^|[\s(>])@([A-Za-z0-9_]{3,16})\b/g, (m, pre, n) => pre + stash(`<a class="mention" href="${HUB}#/u/${encodeURIComponent(n)}">@${n}</a>`));
     s = s.replace(/\[([A-Z0-9]{2,5})\]/g, (m, tag) => stash(`<a class="ctag ctag-inline" href="${HUB}#/c/${tag}">[${tag}]</a>`));
     s = s.replace(/\*\*([^*\n]+?)\*\*/g, "<b>$1</b>");

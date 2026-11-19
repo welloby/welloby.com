@@ -252,7 +252,7 @@
       x: "@WellobyLLC", name: NAME, status: status, days: Math.max(0, Math.floor((Date.now() - start) / 864e5)),
       tiktokUrl: (W.links && W.links.tiktok) || "#watch", instagramUrl: (W.links && W.links.instagram) || "#watch",
       telegramUrl: (W.links && W.links.telegram) || "#watch",
-      map3dUrl: (W.map3d && W.map3d.url) || "#map3d",
+      map3dUrl: (W.map3d && W.map3d.url) || "#map",
       kofi: W.donate && W.donate.kofi,
       calls: "api.mcstatus.io for the status light" + (W.donate && W.donate.stateUrl ? ", and the donation counter for the monthly goal" : "")
     };
@@ -340,13 +340,13 @@
     if (el) el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
   }
   function run(kind, arg) {
-    var A = window.wellobyAtlas, Gm = window.wellobyGames, P = window.wellobyPlanner;
+    var Mp = window.wellobyMap, Gm = window.wellobyGames, P = window.wellobyPlanner;
     if (kind === "copy") copy(arg);
     else if (kind === "go") go(arg);
     else if (kind === "contact") go("#contact");
-    else if (kind === "atlas") { go("#atlas"); if (A) A.setMode(arg); }
-    else if (kind === "roll") { go("#atlas"); if (A) A.rollSpawn(); }
-    else if (kind === "goto") { go("#atlas"); var p = arg.split(",").map(Number); if (A && !A.focusPoint(p[0], p[1])) toast("That spot is outside the surveyed area."); }
+    else if (kind === "map") { if (Mp) { if (arg === "spawn") Mp.spawn(); else Mp.open(); } else go("#map"); }
+    else if (kind === "roll") { if (Mp) Mp.roll(); else go("#map"); }
+    else if (kind === "goto") { var p = arg.split(",").map(Number); if (Mp) Mp.goto(p[0], p[1]); else go("#map"); }
     else if (kind === "game") { go("#games"); if (Gm) Gm.open(arg); }
     else if (kind === "planner") { go("#planner"); if (P) P.set(Number(arg)); }
     else if (kind === "ask") send(arg);

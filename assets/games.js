@@ -1,4 +1,4 @@
-/* Welloby arcade: Spawn Guessr (place a piece of the real atlas) and Elytra Dive (a glide under the sealed Nether roof).
+/* Welloby arcade: Spawn Guessr (find a spot from the live 3D map) and Elytra Dive (a glide under the sealed Nether roof).
    Best scores are kept in localStorage on this device only. */
 (() => {
   "use strict";
@@ -39,163 +39,110 @@
     if (bestEl && src) bestEl.textContent = src.best();
   }
 
-  /* ================= Spawn Guessr ================= */
+  /* ================= Spawn Guessr, on the live 3D map ================= */
   GS = (() => {
-    const G = W.guessr;
+    const G = W.guessr || {};
     const root = $("[data-gs]");
-    if (!G || !root || !G.spots || !G.spots.length) { if (root) root.hidden = true; return { show() {}, best() { return ""; } }; }
-    const clueC = $("[data-gs-clue]"), mapC = $("[data-gs-map]"), over = $("[data-gs-over]"), cap = $("[data-gs-cap]");
+    const M3 = window.wellobyMap3d;
+    if (!root) return { show() {}, best() { return ""; } };
+    const frame = $("[data-gs-frame]"), veil = $("[data-gs-veil]"), over = $("[data-gs-over]"), cap = $("[data-gs-cap]");
     const read = $("[data-gs-read]"), roundEl = $("[data-gs-round]"), scoreEl = $("[data-gs-score]");
     const diffIn = $("[data-gs-diff]"), diffName = $("[data-gs-diff-name]"), diffSize = $("[data-gs-diff-size]");
     const hintBtn = $("[data-gs-hint]"), goBtn = $("[data-gs-go]");
-    const DIFFS = [["Easy", 128], ["Normal", 80], ["Hard", 48], ["Expert", 32], ["Insane", 20]];
+    // the look at each spot: camera distance in blocks, tilt (higher is flatter), turning speed, what the slider says
+    const DIFFS = [
+      ["Easy", 240, 1.0, .22, "high, turning view"],
+      ["Normal", 150, 1.1, .15, "turning view"],
+      ["Hard", 95, 1.15, 0, "still view"],
+      ["Expert", 60, 1.2, 0, "close, still view"],
+      ["Insane", 35, 1.3, 0, "eye level, still"]
+    ];
     const ROUNDS = 5;
+    const inBox = r => s => Math.max(Math.abs(s[0]), Math.abs(s[1])) <= r;
     const AREAS = {
-      inner: { label: "near spawn", minX: -512, minZ: -512, maxX: 512, maxZ: 512 },
-      full: { label: "whole atlas", minX: G.minX, minZ: G.minZ, maxX: G.maxX, maxZ: G.maxZ }
+      inner: { label: "near spawn", span: 2000, spots: (G.spots || []).filter(inBox(960)), view: { x: 0, z: 0, distance: 2300 } },
+      full: { label: "out to 5,000", span: 10000, spots: (G.far || []).filter(inBox(4950)), view: { x: 0, z: 0, distance: 11500 } }
     };
-    let diff = Math.min(4, Math.max(0, store.get("guessr.diff", 1) | 0)), area = store.get("guessr.area", "inner") === "full" ? "full" : "inner";
-    let clueImg = null, mapImg = null, loading = null, ready = false;
-    let state = "idle", rounds = [], round = 0, total = 0, hint = false, guess = null, last = null, result = null;
-
-    function load() {
-      if (loading) return loading;
-      const get = src => new Promise((res, rej) => { const i = new Image(); i.decoding = "async"; i.onload = () => res(i); i.onerror = rej; i.src = src; });
-      paintOver();
-      loading = Promise.all([get(G.clue), get(G.map)]).then(([a, b]) => { clueImg = a; mapImg = b; ready = true; paintOver(); drawMap(); drawClue(); })
-        .catch(() => { loading = null; over.innerHTML = '<div class="go-card"><h3>The map didn\'t load</h3><p>Check your connection, then try again.</p><p><button type="button" class="btn btn-lava" data-gs-retry>Try again</button></p></div>'; });
-      return loading;
-    }
+    if (!AREAS.full.spots.length) AREAS.full.spots = AREAS.inner.spots;
+    let diff = Math.min(4, Math.max(0, store.get("guessr.diff", 1) | 0));
+    let area = store.get("guessr.area", "inner") === "full" ? "full" : "inner";
+    let client = null, ok = false, failed = false, wantStart = false, offline = false;
+    let state = "idle", rounds = [], round = 0, total = 0, hint = false, guess = null, last = [], result = null, cam = null, veilT = 0;
     const A = () => AREAS[area];
-    const span = () => A().maxX - A().minX;
-    function pool() {
-      const a = A(), pad = 12;
-      return G.spots.filter(s => s[0] >= a.minX + pad && s[0] <= a.maxX - pad && s[1] >= a.minZ + pad && s[1] <= a.maxZ - pad);
+    const usable = !!(M3 && M3.embeddable && frame);
+
+    function connectMap() {
+      if (client || !usable) return;
+      failed = false;
+      client = M3.connect(frame, ev => {
+        if (ev.wl === "ready") {
+          ok = true; client.send({ wl: "clean", on: true });
+          if (wantStart) { wantStart = false; start(); } else paintOver();
+        } else if (ev.wl === "timeout") { if (!ok) { failed = true; client = null; wantStart = false; paintOver(); } }
+        else if (ev.wl === "camera") cam = ev;
+        else if (ev.wl === "click" && state === "guess") setGuess(ev.x, ev.z);
+      });
+      frame.src = M3.url + M3.hashFor({ map: "world", x: 0, z: 0, distance: A().view.distance, mode: "flat" });
+      paintOver();
     }
     function pick() {
-      const all = pool().slice(), out = [];
-      for (let tries = 0; out.length < ROUNDS && all.length && tries < 400; tries++) {
+      const all = A().spots.slice(), out = [];
+      for (let tries = 0; out.length < ROUNDS && all.length && tries < 500; tries++) {
         const i = (Math.random() * all.length) | 0, s = all[i];
-        if (out.every(o => Math.hypot(o[0] - s[0], o[1] - s[1]) > span() / 9) || tries > 200) { out.push(s); all.splice(i, 1); }
+        if (out.every(o => Math.hypot(o[0] - s[0], o[1] - s[1]) > A().span / 9) || tries > 250) { out.push(s); all.splice(i, 1); }
       }
       return out;
     }
     function points(d) {
       if (d <= 4) return 1000;
-      return Math.round(1000 * Math.exp(-d / (span() * 0.107)));
+      return Math.round(1000 * Math.exp(-d / (A().span * 0.107)));
     }
     function title(t) {
       return t >= 4500 ? "Map maker" : t >= 3500 ? "Old-timer" : t >= 2500 ? "Highway regular" : t >= 1500 ? "Spawn wanderer" : t >= 700 ? "Fresh spawn" : "Lost in the woods";
     }
     const bestKey = () => diff + "-" + area;
-    function best() { const b = store.get("guessr.best", {}); return b[bestKey()] != null ? "Best on " + DIFFS[diff][0] + ", " + A().label + ": " + fmt(b[bestKey()]) : "No best yet on " + DIFFS[diff][0] + ", " + A().label; }
-
-    /* drawing */
-    function drawClue() {
-      fit(clueC);
-      const g = clueC.getContext("2d"), w = clueC.width, h = clueC.height;
-      g.fillStyle = "#1c1a17"; g.fillRect(0, 0, w, h);
-      if (!clueImg) return;
-      const s = state === "idle" || state === "done" ? null : rounds[round];
-      const f = clueImg.naturalWidth / (G.maxX - G.minX);
-      g.imageSmoothingEnabled = false;
-      if (!s) {
-        // idle: a dim, blurred look at the whole atlas so the card has something behind it
-        g.globalAlpha = .35; g.imageSmoothingEnabled = true;
-        g.drawImage(mapImg || clueImg, 0, 0, w, h); g.globalAlpha = 1;
-        return;
-      }
-      const view = DIFFS[diff][1] * (hint ? 2 : 1);
-      const sx = (s[0] - view / 2 - G.minX) * f, sy = (s[1] - view / 2 - G.minZ) * f;
-      g.drawImage(clueImg, sx, sy, view * f, view * f, 0, 0, w, h);
-      // block grid on close views makes the scale readable
-      if (view <= 48) {
-        g.strokeStyle = "rgba(23,22,20,.16)"; g.lineWidth = 1;
-        const step = w / view;
-        g.beginPath();
-        for (let i = 1; i < view; i++) { const p = Math.round(i * step) + .5; g.moveTo(p, 0); g.lineTo(p, h); g.moveTo(0, p); g.lineTo(w, p); }
-        g.stroke();
-      }
-      if (state === "reveal") {
-        g.strokeStyle = "#ff6a1f"; g.lineWidth = Math.max(2, w / 160);
-        const m = w / 2, r = Math.max(6, w / 40);
-        g.strokeRect(m - r, m - r, 2 * r, 2 * r);
-      }
+    function best() {
+      const b = store.get("guessr3d.best", {});
+      return b[bestKey()] != null ? "Best on " + DIFFS[diff][0] + ", " + A().label + ": " + fmt(b[bestKey()]) : "No best yet on " + DIFFS[diff][0] + ", " + A().label;
     }
-    function toMap(x, z) { const a = A(), w = mapC.width; return [(x - a.minX) / span() * w, (z - a.minZ) / span() * w]; }
-    function fromMap(px, pz) { const a = A(), w = mapC.width; return [Math.round(a.minX + px / w * span()), Math.round(a.minZ + pz / w * span())]; }
-    function drawMap() {
-      fit(mapC);
-      const g = mapC.getContext("2d"), w = mapC.width, a = A();
-      g.fillStyle = "#1c1a17"; g.fillRect(0, 0, w, w);
-      if (!mapImg) return;
-      const f = mapImg.naturalWidth / (G.maxX - G.minX);
-      g.imageSmoothingEnabled = true;
-      g.drawImage(mapImg, (a.minX - G.minX) * f, (a.minZ - G.minZ) * f, span() * f, span() * f, 0, 0, w, w);
-      // dim it slightly so the markers read, and mark 0, 0
-      g.fillStyle = "rgba(23,22,20,.12)"; g.fillRect(0, 0, w, w);
-      const [cx, cz] = toMap(0, 0), u = Math.max(1, w / 280);
-      g.strokeStyle = "rgba(243,236,219,.75)"; g.lineWidth = u;
-      g.beginPath(); g.moveTo(cx - 9 * u, cz); g.lineTo(cx + 9 * u, cz); g.moveTo(cx, cz - 9 * u); g.lineTo(cx, cz + 9 * u); g.stroke();
-      g.font = `500 ${Math.round(10 * u)}px "IBM Plex Mono", monospace`; g.fillStyle = "rgba(243,236,219,.9)";
-      g.fillText("0, 0", cx + 6 * u, cz - 6 * u);
-      const s = rounds[round];
-      if (state === "reveal" && s && guess) {
-        const [tx, tz] = toMap(s[0], s[1]), [gx, gz] = toMap(guess[0], guess[1]);
-        g.setLineDash([6 * u, 5 * u]); g.strokeStyle = "#f3ecdb"; g.lineWidth = 2 * u;
-        g.beginPath(); g.moveTo(gx, gz); g.lineTo(tx, tz); g.stroke(); g.setLineDash([]);
-        mark(g, tx, tz, "#ff6a1f", u, true);
-      }
-      if (guess && (state === "guess" || state === "reveal")) {
-        const [gx, gz] = toMap(guess[0], guess[1]);
-        mark(g, gx, gz, "#f3ecdb", u, false);
-      }
-      if (state === "done") {
-        rounds.forEach((s2, i) => { const [tx, tz] = toMap(s2[0], s2[1]); mark(g, tx, tz, "#ff6a1f", u, true, String(i + 1)); });
-      }
-    }
-    function mark(g, x, z, color, u, solid, label) {
-      const r = 7 * u;
-      g.lineWidth = 2.5 * u; g.strokeStyle = "#171614";
-      if (solid) { g.fillStyle = color; g.fillRect(x - r, z - r, 2 * r, 2 * r); g.strokeRect(x - r, z - r, 2 * r, 2 * r); }
-      else {
-        g.strokeRect(x - r - u, z - r - u, 2 * r + 2 * u, 2 * r + 2 * u);
-        g.strokeStyle = color; g.lineWidth = 2 * u; g.strokeRect(x - r, z - r, 2 * r, 2 * r);
-        g.beginPath(); g.moveTo(x - r - 5 * u, z); g.lineTo(x - r + 3 * u, z); g.moveTo(x + r - 3 * u, z); g.lineTo(x + r + 5 * u, z);
-        g.moveTo(x, z - r - 5 * u); g.lineTo(x, z - r + 3 * u); g.moveTo(x, z + r - 3 * u); g.lineTo(x, z + r + 5 * u); g.stroke();
-      }
-      if (label) { g.fillStyle = "#171614"; g.font = `700 ${Math.round(10 * u)}px "DM Sans", sans-serif`; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(label, x, z + .5); g.textAlign = "left"; g.textBaseline = "alphabetic"; }
+    function veilFor(ms) {
+      clearTimeout(veilT); veil.dataset.on = "1";
+      veilT = setTimeout(() => { veil.dataset.on = "0"; }, ms);
     }
 
     /* ui */
     function paintSettings() {
       diffIn.value = diff;
       diffName.textContent = DIFFS[diff][0];
-      diffSize.textContent = DIFFS[diff][1] + " blocks across";
-      diffIn.setAttribute("aria-valuetext", DIFFS[diff][0] + ", " + DIFFS[diff][1] + " blocks across");
+      diffSize.textContent = DIFFS[diff][4];
+      diffIn.setAttribute("aria-valuetext", DIFFS[diff][0] + ", " + DIFFS[diff][4]);
       $$("[data-gs-area]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.gsArea === area)));
-      const lock = state === "guess" || state === "reveal";
+      const lock = state === "look" || state === "guess" || state === "reveal";
       diffIn.disabled = lock;
       $$("[data-gs-area]").forEach(b => { b.disabled = lock; });
     }
-    // the help bot's button steps aside only while a round is on screen, so it never covers Guess
+    // the help bot's button steps aside only while a round is on screen, so it never covers the game buttons
     let inView = false;
     new IntersectionObserver(es => { inView = es.some(e => e.isIntersecting && e.intersectionRatio > .15); sync(); }, { threshold: [0, .15, .4] }).observe(root);
-    function sync() { document.documentElement.classList.toggle("gs-on", inView && !root.hidden && (state === "guess" || state === "reveal")); }
+    function sync() { document.documentElement.classList.toggle("gs-on", inView && !root.hidden && (state === "look" || state === "guess" || state === "reveal")); }
     function paintBar() {
       root.dataset.state = state;
       sync();
       if (state === "idle") { roundEl.textContent = ROUNDS + " rounds"; scoreEl.textContent = "Up to 1,000 points each"; }
       else if (state === "done") { roundEl.textContent = "Finished"; scoreEl.textContent = fmt(total) + " points"; }
       else { roundEl.textContent = "Round " + (round + 1) + " of " + ROUNDS; scoreEl.textContent = fmt(total) + " points"; }
-      hintBtn.disabled = state !== "guess" || hint;
-      goBtn.disabled = !(state === "guess" && guess) && state !== "reveal";
-      goBtn.textContent = state === "reveal" ? (round + 1 < ROUNDS ? "Next round" : "See your score") : "Guess";
-      cap.textContent = state === "guess" ? "Where is this? North is up." + (hint ? " Zoomed out." : "") : state === "reveal" ? "The orange square is where it was." : "";
+      hintBtn.hidden = !(state === "look" || state === "guess");
+      hintBtn.disabled = state === "look" && hint;
+      hintBtn.innerHTML = state === "guess" ? "Look again" : "Look wider <small>costs 30%</small>";
+      goBtn.disabled = !(state === "look" || state === "guess" || state === "reveal");
+      goBtn.textContent = state === "look" ? "Make a guess" : state === "guess" ? "Lock in guess" : state === "reveal" ? (round + 1 < ROUNDS ? "Next round" : "See your score") : "Make a guess";
+      cap.textContent = state === "look" ? "Where on the map is this?" + (hint ? " Wider view." : "")
+        : state === "guess" ? "Top-down map, north is up. " + (guess ? "Pin dropped. Click again to move it." : "Click to drop your pin.")
+        : state === "reveal" ? "Orange is where it was, white is your guess." : "";
       paintBest();
     }
     function paintOver() {
-      over.hidden = state === "guess" || state === "reveal";
+      over.hidden = state === "look" || state === "guess" || state === "reveal";
       if (over.hidden) return;
       if (state === "done") {
         const isBest = result.isBest, prev = result.prev;
@@ -205,92 +152,114 @@
           '<p class="go-acts"><button type="button" class="btn btn-lava" data-gs-start>Play again</button><button type="button" class="btn btn-line btn-s" data-gs-copy><svg class="i"><use href="#i-share"/></svg>Copy score</button></p></div>';
         return;
       }
-      over.innerHTML = '<div class="go-card"><h3>Spawn Guessr</h3><p>You see a piece of the real map. Put a marker where you think it is on the map beside it. ' + ROUNDS + ' rounds, up to 1,000 points each. The closer, the more points.</p>' +
-        '<p class="go-acts"><button type="button" class="btn btn-lava" data-gs-start' + (ready ? "" : " disabled") + '>' + (ready ? "Start" : "Loading the map") + '</button></p></div>';
+      if (!usable || offline) {
+        over.innerHTML = '<div class="go-card"><h3>Spawn Guessr</h3><p>This game runs on the live 3D map, which can\'t load inside this page right now. Elytra Dive works in the meantime.</p>' +
+          (M3 && M3.fallback ? '<p class="go-acts"><a class="btn btn-line btn-s" href="' + M3.fallback + '" target="_blank" rel="noopener">Open the 3D map in a new tab</a></p>' : '') + '</div>';
+        return;
+      }
+      const busy = wantStart || (!!client && !ok);
+      over.innerHTML = '<div class="go-card"><h3>Spawn Guessr</h3><p>You get a 3D look at a real spot on the server. Then drop a pin on the top-down map where you think it is. ' +
+        ROUNDS + ' rounds, up to 1,000 points each. The closer, the more points.</p>' +
+        (failed ? '<p><b>The 3D map didn\'t answer.</b> Check your connection and try again.</p>' : '') +
+        '<p class="go-acts"><button type="button" class="btn btn-lava" data-gs-start' + (busy ? " disabled" : "") + '>' +
+        (busy ? "Loading the 3D map" : failed ? "Try again" : "Start") + '</button></p></div>';
+    }
+    function paintAll() { paintOver(); paintSettings(); paintBar(); }
+
+    /* rounds */
+    function look(fresh) {
+      const s = rounds[round], d = DIFFS[diff], k = hint ? 2.2 : 1;
+      state = "look";
+      veilFor(fresh ? 1300 : 700);
+      if (fresh) client.send({ wl: "pins", pins: [] });
+      client.send({ wl: "view", map: "world", x: s[0] + .5, z: s[1] + .5, distance: d[1] * k, angle: hint ? Math.min(d[2], .95) : d[2],
+        rotation: fresh ? Math.random() * 6.283 : undefined, mode: "perspective", fly: 0 });
+      client.send({ wl: "orbit", speed: reduced.matches ? 0 : (d[3] || (hint ? .12 : 0)) });
+      paintAll();
     }
     function start() {
-      if (!ready) { load(); return; }
-      rounds = pick(); round = 0; total = 0; hint = false; guess = null; last = [];
-      if (rounds.length < ROUNDS) { toast("Not enough spots in this area. Try the whole atlas."); return; }
-      state = "guess";
-      paintOver(); paintSettings(); paintBar(); drawClue(); drawMap();
-      read.textContent = "Round 1. Put the marker where you think the piece is.";
-      mapC.focus({ preventScroll: true });
+      if (!usable) return;
+      if (!ok) {
+        if (wantStart) return;
+        wantStart = true; paintOver();
+        M3.check().then(up => { if (up) connectMap(); else { offline = true; wantStart = false; paintOver(); } });
+        return;
+      }
+      rounds = pick(); round = 0; total = 0; last = []; hint = false; guess = null;
+      if (rounds.length < ROUNDS) { toast("Not enough spots in this area yet. Try near spawn."); return; }
+      look(true);
+      read.textContent = "Round 1. Look around, then make your guess.";
     }
-    function setGuess(x, z, say) {
-      const a = A();
-      guess = [Math.max(a.minX, Math.min(a.maxX, x)), Math.max(a.minZ, Math.min(a.maxZ, z))];
-      drawMap(); paintBar();
-      if (say) read.textContent = "Marker at x " + fmt(guess[0]) + ", z " + fmt(guess[1]) + ". Press Enter to guess.";
+    function toGuess() {
+      state = "guess";
+      client.send({ wl: "orbit", speed: 0 });
+      veilFor(500);
+      const v = A().view, at = guess ? { x: guess[0], z: guess[1], distance: Math.min(v.distance, 900) } : v;
+      client.send({ wl: "view", map: "world", x: at.x, z: at.z, distance: at.distance, mode: "flat", fly: 0 });
+      if (guess) client.send({ wl: "pins", pins: [{ x: guess[0], z: guess[1], kind: "guess", label: "Your guess" }] });
+      paintAll();
+      read.textContent = "Click where you think it was, or line up the cross and lock it in. Drag to move, scroll or pinch to zoom.";
+    }
+    function setGuess(x, z) {
+      guess = [Math.round(x), Math.round(z)];
+      client.send({ wl: "pins", pins: [{ x: guess[0], z: guess[1], kind: "guess", label: "Your guess" }] });
+      paintBar();
+      read.textContent = "Pin at x " + fmt(guess[0]) + ", z " + fmt(guess[1]) + ". Lock it in, or click again to move it.";
     }
     function confirm() {
-      if (state === "guess" && guess) {
-        const s = rounds[round], d = Math.hypot(s[0] - guess[0], s[1] - guess[1]);
+      if (state === "look") { toGuess(); return; }
+      if (state === "guess") {
+        const g = guess || (cam && cam.mode === "flat" ? [cam.x, cam.z] : null);
+        if (!g) { read.textContent = "Click the map to drop your pin first."; return; }
+        guess = g;
+        const s = rounds[round], d = Math.hypot(s[0] - g[0], s[1] - g[1]);
         const p = Math.round(points(d) * (hint ? .7 : 1));
         total += p; last.push({ d, p });
         state = "reveal";
-        read.textContent = fmt(d) + " blocks off. +" + fmt(p) + " points" + (hint ? " (zoomed out)" : "") + ". It was at x " + fmt(s[0]) + ", z " + fmt(s[1]) + ".";
-        paintBar(); drawMap(); drawClue();
+        client.send({ wl: "pins", line: true, pins: [{ x: g[0], z: g[1], kind: "guess", label: "Your guess" }, { x: s[0], z: s[1], kind: "real", label: "It was here" }] });
+        client.send({ wl: "view", mode: "flat", x: (s[0] + g[0]) / 2, z: (s[1] + g[1]) / 2, distance: Math.max(170, d * 1.9), fly: reduced.matches ? 0 : 1200 });
+        read.textContent = fmt(d) + " blocks off. +" + fmt(p) + " points" + (hint ? " (wider view)" : "") + ". It was at x " + fmt(s[0]) + ", z " + fmt(s[1]) + ".";
+        paintAll();
         goBtn.focus({ preventScroll: true });
-      } else if (state === "reveal") {
-        if (round + 1 < ROUNDS) {
-          round++; hint = false; guess = null; state = "guess";
-          read.textContent = "Round " + (round + 1) + ". Put the marker where you think the piece is.";
-          paintBar(); drawClue(); drawMap(); mapC.focus({ preventScroll: true });
-        } else {
-          state = "done"; read.textContent = "Done. " + fmt(total) + " points.";
-          const key = bestKey(), b = store.get("guessr.best", {}), prev = b[key];
-          result = { isBest: prev == null || total > prev, prev };
-          if (result.isBest) { b[key] = total; store.set("guessr.best", b); }
-          paintOver(); paintSettings(); paintBar(); drawClue(); drawMap();
-          const again = over.querySelector("[data-gs-start]"); if (again) again.focus({ preventScroll: true });
-        }
+        return;
       }
+      if (state === "reveal") {
+        if (round + 1 < ROUNDS) {
+          round++; hint = false; guess = null;
+          look(true);
+          read.textContent = "Round " + (round + 1) + ". Look around, then make your guess.";
+        } else finish();
+      }
+    }
+    function finish() {
+      state = "done";
+      read.textContent = "Done. " + fmt(total) + " points.";
+      const key = bestKey(), b = store.get("guessr3d.best", {}), prev = b[key];
+      result = { isBest: prev == null || total > prev, prev };
+      if (result.isBest) { b[key] = total; store.set("guessr3d.best", b); }
+      client.send({ wl: "pins", pins: rounds.map((s, i) => ({ x: s[0], z: s[1], kind: "real", label: String(i + 1) })) });
+      const v = A().view;
+      client.send({ wl: "view", mode: "flat", x: v.x, z: v.z, distance: v.distance, fly: reduced.matches ? 0 : 900 });
+      paintAll();
+      const again = over.querySelector("[data-gs-start]"); if (again) again.focus({ preventScroll: true });
     }
 
     over.addEventListener("click", e => {
       if (e.target.closest("[data-gs-start]")) start();
-      else if (e.target.closest("[data-gs-retry]")) { over.innerHTML = ""; load(); }
       else if (e.target.closest("[data-gs-copy]")) copy("welloby spawn guessr: " + fmt(total) + " / " + fmt(ROUNDS * 1000) + " on " + DIFFS[diff][0] + " (" + A().label + "). " + title(total).toLowerCase() + ". think you know spawn better? welloby.com", "your score");
     });
     goBtn.addEventListener("click", confirm);
-    hintBtn.addEventListener("click", () => { if (state === "guess" && !hint) { hint = true; drawClue(); paintBar(); read.textContent = "Zoomed out. This round now scores 70%."; } });
+    hintBtn.addEventListener("click", () => {
+      if (state === "look" && !hint) { hint = true; look(false); read.textContent = "Wider view. This round now scores 70%."; }
+      else if (state === "guess") { look(false); read.textContent = "Back at the spot. Make your guess when you're ready."; }
+    });
     diffIn.addEventListener("input", () => { diff = +diffIn.value; store.set("guessr.diff", diff); paintSettings(); paintBest(); });
     $$("[data-gs-area]").forEach(b => b.addEventListener("click", () => {
       if (b.disabled) return;
-      area = b.dataset.gsArea; store.set("guessr.area", area); guess = null; paintSettings(); paintBest(); drawMap();
+      area = b.dataset.gsArea; store.set("guessr.area", area); paintSettings(); paintBest();
     }));
-    function mapPoint(e) { const r = mapC.getBoundingClientRect(); return fromMap((e.clientX - r.left) / r.width * mapC.width, (e.clientY - r.top) / r.height * mapC.height); }
-    mapC.addEventListener("pointerdown", e => {
-      if (state !== "guess") { if (state === "idle" && ready) toast("Press Start first."); return; }
-      const [x, z] = mapPoint(e); setGuess(x, z, false);
-      read.textContent = "Marker at x " + fmt(guess[0]) + ", z " + fmt(guess[1]) + ".";
-    });
-    mapC.addEventListener("pointermove", e => {
-      if (e.pointerType !== "mouse" || state !== "guess" || guess) return;
-      const [x, z] = mapPoint(e); cap.textContent = "Where is this? North is up. Pointer at x " + fmt(x) + ", z " + fmt(z) + ".";
-    });
-    mapC.addEventListener("keydown", e => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        if (state === "idle" || state === "done") start();
-        else if (state === "guess" && !guess) read.textContent = "Place the marker first: click the map or use the arrow keys.";
-        else confirm();
-        return;
-      }
-      if (state !== "guess") return;
-      const step = (e.shiftKey ? 4 : 1) * Math.max(8, Math.round(span() / 64));
-      const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
-      if (!d) return;
-      e.preventDefault();
-      const base = guess || [0, 0];
-      setGuess(base[0] + d[0], base[1] + d[1], true);
-    });
-    new ResizeObserver(() => { drawClue(); drawMap(); }).observe(clueC);
-    new ResizeObserver(() => drawMap()).observe(mapC);
-    new IntersectionObserver((es, ob) => { if (es.some(x => x.isIntersecting)) { load(); ob.disconnect(); } }, { rootMargin: "300px" }).observe(root);
     paintSettings(); paintBar(); paintOver();
-    return { show() { load(); drawClue(); drawMap(); sync(); }, sync, best };
+    return { show() { sync(); }, sync, best };
   })();
 
   /* ================= Elytra Dive ================= */

@@ -150,11 +150,11 @@
   /* ---------- reveal on scroll ---------- */
   const groups = [
     ".sec-lede", ".lede", ".intro-facts .facts > div", ".nolist", ".ticket",
-    ".banned li", ".allowed h3", ".allowed li", ".rules .fine",
+    ".allowed h3", ".allowed li", ".rules .fine",
     ".spec > div", ".cmds h3", ".cmds > p", ".cmds tbody tr",
     ".pl-in", ".pl-out", ".faq details", ".reach", ".band-copy",
     ".tipjar", ".free-help h3", ".help-list li", ".vote-list li",
-    ".asset", ".brand-files > div", ".teaser", ".cab", ".atlas",
+    ".asset", ".brand-files > div", ".cab", ".mapx",
   ];
   const toReveal = [];
   for (const sel of groups) {
@@ -277,35 +277,6 @@
     burst(e.clientX || r.left + r.width / 2, e.clientY || r.top + r.height / 2);
   });
 
-  /* ---------- block cursor: the Minecraft selection outline ---------- */
-  if (fine && !reduced) {
-    const cur = document.createElement("div");
-    cur.className = "cursor"; cur.setAttribute("aria-hidden", "true");
-    document.body.append(cur);
-    let x = -100, y = -100, cx = -100, cy = -100, size = 22, cs = 22, on = false, raf = 0;
-    const loop = () => {
-      cx += (x - cx) * .22; cy += (y - cy) * .22; cs += (size - cs) * .2;
-      cur.style.transform = "translate(" + (cx - cs / 2).toFixed(1) + "px," + (cy - cs / 2).toFixed(1) + "px)";
-      cur.style.width = cur.style.height = cs.toFixed(1) + "px";
-      raf = (Math.abs(x - cx) + Math.abs(y - cy) + Math.abs(size - cs) > .3) ? requestAnimationFrame(loop) : 0;
-    };
-    document.addEventListener("pointermove", e => {
-      if (e.pointerType !== "mouse") return;
-      x = e.clientX; y = e.clientY;
-      const t = e.target;
-      const hide = !!(t.closest && t.closest("canvas, input, textarea, select, .kz, .cmdk, .atlas, .cab"));
-      const hot = !hide && !!(t.closest && t.closest("a, button, summary, label, [role=tab]"));
-      size = hot ? 44 : 22;
-      cur.dataset.hot = hot ? "1" : "0";
-      cur.dataset.show = hide ? "0" : "1";
-      if (!on) { on = true; cx = x; cy = y; }
-      if (!raf) raf = requestAnimationFrame(loop);
-    }, { passive: true });
-    document.addEventListener("pointerdown", () => { cur.dataset.down = "1"; });
-    document.addEventListener("pointerup", () => { cur.dataset.down = "0"; });
-    document.documentElement.addEventListener("pointerleave", () => { cur.dataset.show = "0"; });
-  }
-
   /* ---------- quick-jump palette (Ctrl K or /) ---------- */
   const go = (id, then) => () => {
     const el = document.getElementById(id);
@@ -322,9 +293,9 @@
     { g: "Do", t: "Copy the Java address", s: "mc.welloby.com", k: "ip copy server join java", run: copy("mc.welloby.com") },
     { g: "Do", t: "Copy the Bedrock address", s: "bedrock.welloby.com, port 25620", k: "ip copy bedrock phone console port", run: copy("bedrock.welloby.com") },
     { g: "Do", t: "Ask kevzy", s: "The help bot answers right here", k: "help bot question support chat", run: () => window.kevzy && window.kevzy.open(), need: () => !!window.kevzy },
-    { g: "Do", t: "Play Spawn Guessr", s: "Place a piece of the real map", k: "game play guess arcade", run: go("games", () => window.wellobyGames && window.wellobyGames.open("guessr")) },
+    { g: "Do", t: "Play Spawn Guessr", s: "Find real spots from the 3D map", k: "game play guess arcade", run: go("games", () => window.wellobyGames && window.wellobyGames.open("guessr")) },
     { g: "Do", t: "Play Elytra Dive", s: "Fly under the Nether roof", k: "game play elytra fly arcade", run: go("games", () => window.wellobyGames && window.wellobyGames.open("elytra")) },
-    { g: "Do", t: "Roll a spawn on the atlas", s: "See where a new player might land", k: "map spawn random atlas", run: go("atlas", () => window.wellobyAtlas && window.wellobyAtlas.rollSpawn()) },
+    { g: "Do", t: "Roll a spawn on the 3D map", s: "See where a new player might land", k: "map spawn random roll 3d", run: () => window.wellobyMap ? window.wellobyMap.roll() : go("map")() },
     { g: "Do", t: "Vote for Welloby", s: "Once a day, small reward in game", k: "vote list reward", run: () => window.open("https://bestminecraftserverlist.net/vote/welloby-anarchy", "_blank", "noopener") },
     { g: "Do", t: "Open the Discord", s: "Chat, reports, ban appeals", k: "discord chat community appeal report", run: () => window.open("https://discord.gg/cwHKDtXQWD", "_blank", "noopener") },
   ];
@@ -424,7 +395,7 @@
   document.addEventListener("keydown", e => {
     const t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
     if ((e.key === "k" || e.key === "K") && (e.ctrlKey || e.metaKey) && !e.altKey) { e.preventDefault(); dlg && dlg.open ? close() : open(); }
-    else if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey && !(t && t.closest && t.closest("canvas, .atlas, .cab"))) { e.preventDefault(); open(); }
+    else if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey && !(t && t.closest && t.closest("canvas, .mapx, .cab"))) { e.preventDefault(); open(); }
   });
 
   /* FAQ: only animate the opening where the browser can't do it in CSS */

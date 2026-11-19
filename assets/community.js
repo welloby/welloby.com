@@ -223,7 +223,7 @@
         <button type="button" data-wrap="**" title="Bold"><b>B</b></button><button type="button" data-wrap="*" title="Italic"><i>I</i></button>
         <button type="button" data-wrap="~~" title="Strikethrough"><s>S</s></button><button type="button" data-wrap="\`" title="Code">{ }</button>
         <button type="button" data-wrap="||" title="Spoiler">Spoiler</button><button type="button" data-line="> " title="Quote">Quote</button>
-        <button type="button" data-insert="x 0 z 0" title="Coordinates become a link to the spawn atlas">Coords</button>
+        <button type="button" data-insert="x 0 z 0" title="Coordinates become a link to the 3D map">Coords</button>
         <span class="cmp-gap"></span>
         <button type="button" data-preview aria-pressed="false">Preview</button>
       </div>
