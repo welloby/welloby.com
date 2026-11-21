@@ -8,7 +8,7 @@
 - versions: stable Java 1.7.2–26.3 through ViaVersion5.12.1, ViaBackwards5.12.1 and ViaRewind4.2.0; native/server version26.3. Declared protocol support does not mean every release has been individually gameplay-tested.
 - supported stable Java releases: 1.7.2, 1.7.3, 1.7.4, 1.7.5, 1.7.6, 1.7.7, 1.7.8, 1.7.9, 1.7.10, 1.8, 1.8.1, 1.8.2, 1.8.3, 1.8.4, 1.8.5, 1.8.6, 1.8.7, 1.8.8, 1.8.9, 1.9, 1.9.1, 1.9.2, 1.9.3, 1.9.4, 1.10, 1.10.1, 1.10.2, 1.11, 1.11.1, 1.11.2, 1.12, 1.12.1, 1.12.2, 1.13, 1.13.1, 1.13.2, 1.14, 1.14.1, 1.14.2, 1.14.3, 1.14.4, 1.15, 1.15.1, 1.15.2, 1.16, 1.16.1, 1.16.2, 1.16.3, 1.16.4, 1.16.5, 1.17, 1.17.1, 1.18, 1.18.1, 1.18.2, 1.19, 1.19.1, 1.19.2, 1.19.3, 1.19.4, 1.20, 1.20.1, 1.20.2, 1.20.3, 1.20.4, 1.20.5, 1.20.6, 1.21, 1.21.1, 1.21.2, 1.21.3, 1.21.4, 1.21.5, 1.21.6, 1.21.7, 1.21.8, 1.21.9, 1.21.10, 1.21.11, 26.1, 26.1.1, 26.1.2, 26.2, 26.3
 - declared Bedrock releases: 26.30, 26.31, 26.32, 26.33, 26.34, 26.40, 26.41, 26.42, 26.43, 26.44, 26.45, 26.50, 26.51, 26.52. Bedrock players are joining normally on the current build.
-- hosting: London, United Kingdom, online 24/7, DDoS protected (TCPShield), no daily restart
+- hosting: London, United Kingdom, online 24/7, DDoS protected (TCPShield), one short automatic restart a day (09:40 UTC)
 - world: hard mode, keepInventory off, spawn protection 0, random first spawn 100-1000 blocks from 0,0, vanilla world border, map never resets
 - allowed: hacked clients, xray, tnt/rail/carpet/string/sand dupers, bedrock breaking, pearl stasis, griefing, stealing, traps, pvp anywhere, alts
 - finding people: /lfg posts your own coordinates in public chat once (5 minute cooldown) so somebody can walk to you; /coords toggles your own x y z on your action bar. No command shows where another player is.
