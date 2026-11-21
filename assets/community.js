@@ -1028,9 +1028,13 @@
           <p class="fine">Take the code out again once you're verified.</p>`
           : '<p><button type="button" class="btn btn-ink btn-s" data-vstart>Get a verification code</button></p>'}
         ${errBox()}</section>` : "";
+    // Votifier can sit on either listed address; a Java address behind a proxy such as TCPShield can't take votes
+    const vHosts = [s.host, s.bedrock && s.bedrock.host].filter((h, i, a) => h && a.indexOf(h) === i);
+    const vHost = mg && vHosts.includes(mg.votifierHost) ? mg.votifierHost : s.host;
     const votifierPanel = mg && s.verified && (my.owner || me().role === "admin") ? `<form class="card form" data-votifier>
         <h2>Vote rewards</h2>
         <p class="fine">Install <b>NuVotifier</b> and a vote plugin. Every vote here goes to it with the service name <code>Welloby</code> and the voter's in-game name, and your plugin hands out the reward.</p>
+        ${vHosts.length > 1 ? `<label class="fld"><span>Votifier address <small>the one that reaches the machine itself, not a proxy like TCPShield</small></span><select name="host">${vHosts.map(h => `<option${h === vHost ? " selected" : ""}>${esc(h)}</option>`).join("")}</select></label>` : ""}
         <div class="grid2">
           <label class="fld"><span>Votifier port</span><input name="port" type="number" min="1" max="65535" value="${mg.votifierPort || 8192}"></label>
           <label class="fld"><span>Token <small>from NuVotifier's config.yml</small></span><input name="token" type="password" autocomplete="off" placeholder="${mg.votifierSet ? "Saved. Paste a new one to change it" : "Paste the token"}"></label>
@@ -1110,7 +1114,8 @@
     }));
     on("submit", "[data-votifier]", (e, f) => busy($("button[type=submit]", f), async () => {
       formErr(f, "");
-      try { await api(`/servers/${s.id}/votifier`, { method: "PUT", body: { port: Number(f.port.value), token: f.token.value.trim() } }); toast("Saved. Send a test vote to check it."); reload(); }
+      const host = f.elements.namedItem("host");
+      try { await api(`/servers/${s.id}/votifier`, { method: "PUT", body: { port: Number(f.port.value), token: f.token.value.trim(), ...(host ? { host: host.value } : {}) } }); toast("Saved. Send a test vote to check it."); reload(); }
       catch (err) { formErr(f, err.message); }
     }));
     on("click", "[data-vtest]", (e, b) => busy(b, async () => {
