@@ -20,7 +20,7 @@ window.WELLOBY = {
  "links": {
   "discord": "https://discord.gg/cwHKDtXQWD",
   "x": "https://x.com/WellobyLLC",
-  "tiktok": "https://www.tiktok.com/@aurimas.dvirnaiti",
+  "tiktok": "https://www.tiktok.com/@wellobyanarchy",
   "instagram": "https://www.instagram.com/welloby_official/",
   "telegram": "https://t.me/welloby",
   "youtube": ""
@@ -53,7 +53,7 @@ window.WELLOBY = {
   {
    "platform": "tiktok",
    "id": "7707114976057527566",
-   "url": "https://www.tiktok.com/@aurimas.dvirnaiti/video/7707114976057527566",
+   "url": "https://www.tiktok.com/@wellobyanarchy/video/7707114976057527566",
    "title": "No rules, hacked clients allowed, and the map never resets",
    "by": "Welloby"
   },
