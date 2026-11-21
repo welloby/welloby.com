@@ -352,7 +352,7 @@
     d.className = "terms-gate notch";
     d.setAttribute("data-terms-gate", "");
     d.setAttribute("aria-labelledby", "terms-gate-title");
-    d.innerHTML = `<p class="kicker">New terms · ${TERMS.label}</p>
+    d.innerHTML = `<p class="kicker">New terms \u00b7 ${TERMS.label}</p>
       <h2 id="terms-gate-title">Accept the Welloby terms</h2>
       <p>Welloby now has terms for the server, the Discord and this site. The short version: staff can ban anyone, for any reason. You play at your own risk, and Welloby isn't responsible for what you lose.</p>
       <p><a href="${TERMS.url}" target="_blank" rel="noopener">Read the full terms</a></p>
@@ -399,7 +399,7 @@
     const paintJoin = () => {
       if (!join) return;
       join.href = me ? userHref(me) : HUB + "#/register";
-      join.textContent = me ? "Your profile" : "Claim your name";
+      join.textContent = me ? "Your profile" : "Create an account";
     };
     subs.add(paintJoin); paintJoin();
     teaser.hidden = false;

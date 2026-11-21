@@ -526,6 +526,54 @@ h1 .tr-flag .i{width:.5em;height:.5em;margin-right:.15em}
 .terms-gate a{font-weight:700;color:var(--ember);text-underline-offset:3px}
 .terms-gate-acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 .terms-gate .btn-line{color:var(--ink);border-color:var(--ink)}
+/* sign-in with Google, Discord, Facebook: each in its own colours, as their guidelines ask */
+.social-in{display:grid;gap:8px}
+.btn-social{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:46px;padding:10px 16px;border:1px solid transparent;font:600 15.5px/1.2 var(--body);cursor:pointer;transition:filter .15s,transform .15s}
+.btn-social svg{width:20px;height:20px;flex:none}
+.btn-social:hover{filter:brightness(1.07)}
+.btn-social:active{transform:translateY(1px)}
+.btn-social:focus-visible{outline:3px solid var(--lava-hot);outline-offset:2px}
+.btn-social.is-busy{opacity:.7;cursor:progress}
+.btn-social.is-google{background:#fff;color:#1f1f1f;border-color:#747775}
+.btn-social.is-discord{background:#5865f2;color:#fff}
+.btn-social.is-facebook{background:#1877f2;color:#fff}
+.or-line{display:flex;align-items:center;gap:12px;margin:2px 0;font-size:13.5px;font-weight:600;color:var(--ink-soft)}
+.or-line::before,.or-line::after{content:"";flex:1;height:1px;background:var(--bone-rule)}
+.pw{position:relative;display:block}
+.pw input{padding-right:50px}
+.pw-eye{position:absolute;right:3px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:42px;height:40px;padding:0;border:0;background:none;color:inherit;opacity:.6;cursor:pointer}
+.pw-eye:hover,.pw-eye[aria-pressed=true]{opacity:1}
+.pw-eye:focus-visible{outline:3px solid var(--lava-hot);outline-offset:-3px}
+.pw-eye svg{width:20px;height:20px}
+.fld-aside{margin:-8px 0 0;font-size:14px;font-weight:600;text-align:right}
+.fld-aside a,.authmsg a,.authlede a{color:var(--ember)}
+.authmsg,.authlede{font-size:16px;line-height:1.55}
+.authmsg p+p{margin-top:10px}
+.pw-opt{display:grid;gap:12px}
+.pw-opt summary{cursor:pointer;font-weight:700;font-size:14.5px}
+.pw-opt summary small{font-weight:500;color:var(--ink-soft)}
+.mail-note{padding:12px 14px;background:rgba(255,106,31,.12);border-left:3px solid var(--lava);font-size:15px;line-height:1.5}
+.mail-note a{color:var(--lava)}
+.welcome .mail-note{max-width:640px;text-align:left}
+.chip-ok{border-color:var(--ok);color:var(--ok)}
+.chip-warn{border-color:#f2b632;color:#f2b632}
+.acct-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px;overflow-wrap:anywhere}
+.acct-line .chip{margin:0}
+.h-aside{font:500 13px/1 var(--body);color:var(--ash);margin-left:6px}
+.linked{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.linked li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--stone)}
+.linked b{display:block}
+.linked small{display:block;color:var(--ash);font-size:13px;overflow-wrap:anywhere}
+.lk-ico{display:grid;place-items:center;width:36px;height:36px;background:#fff;color:#171614}
+.lk-ico svg{width:20px;height:20px}
+.lk-ico.is-discord{background:#5865f2;color:#fff}
+.lk-ico.is-facebook{background:#1877f2;color:#fff}
+.lk-ico.is-pass{background:var(--ink);color:var(--bone);border:1px solid var(--stone)}
+/* the in-game name next to the nickname */
+.pcard-ign{display:block;font:500 12.5px/1.3 var(--mono);color:var(--ash);overflow-wrap:anywhere}
+.pf-ign{margin:6px 0 0;font:500 15px/1.4 var(--mono);color:var(--ash)}
+.pf-ign b{color:var(--bone)}
+.pf-ign small{margin-left:6px;color:var(--ok)}
 .welcome .welcomecard{display:grid;justify-items:center;gap:14px;width:min(900px,100%);text-align:center}
 .welcome h1{font-size:clamp(46px,7vw,100px)}
 .welcome .mast-lede{margin-top:0}
@@ -538,7 +586,7 @@ h1 .tr-flag .i{width:.5em;height:.5em;margin-right:.15em}
 
 /* ---------- settings and staff ---------- */
 .settings{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start;padding-bottom:90px}
-.settings-side{display:grid;gap:18px}
+.settings-side,.settings-main{display:grid;gap:18px;align-content:start;min-width:0}
 .facepick{display:grid;grid-template-columns:auto minmax(0,1fr);gap:18px;align-items:center}
 .facepick p{color:var(--ash);font-size:14.5px}
 .facepick p+p{margin-top:10px}
@@ -756,4 +804,9 @@ h1 .tr-flag .i{width:.5em;height:.5em;margin-right:.15em}
   .addr-big small{grid-column:3;grid-row:1;justify-self:end;white-space:nowrap}
   .addr-big b{grid-column:2/4;grid-row:2}
   .sreport{text-align:left}
+}
+@media (max-width:440px){
+  /* the sign-in methods list: the button drops under the name on narrow phones */
+  .linked li{grid-template-columns:auto minmax(0,1fr)}
+  .linked li>button{grid-column:2;justify-self:start}
 }

@@ -139,7 +139,7 @@
   }
   const fields = form => Object.fromEntries(new FormData(form).entries());
   function needSignIn(what) {
-    return `<div class="cm-gate notch"><h2>Sign in ${esc(what)}</h2><p>Accounts are free and use your in-game name. Your password here is separate from the one you use in game.</p>
+    return `<div class="cm-gate notch"><h2>Sign in ${esc(what)}</h2><p>Accounts are free and take a minute, or one click with Google, Discord or Facebook. Your password here is separate from the one you use in game.</p>
       <p class="cm-gate-acts"><a class="btn btn-lava" href="#/login?next=${enc(location.hash)}">Sign in</a><a class="btn btn-line" href="#/register?next=${enc(location.hash)}">Create an account</a></p></div>`;
   }
   function pager(pageNo, pages, base) {
@@ -184,6 +184,7 @@
       <a class="pcard-hit" href="${WC.userHref(u)}" aria-label="${esc(u.name)}"></a>
       ${head(u, 64, "pcard-head")}
       <div class="pcard-txt"><b>${esc(u.name)}</b>${u.clan ? ctag(u.clan) : ""}<span class="pcard-badges">${badges(u, true)}</span>
+      ${u.ign && u.ign.toLowerCase() !== u.name.toLowerCase() ? `<small class="pcard-ign">in game ${esc(u.ign)}</small>` : ""}
       <small>${u.tags && u.tags.length ? u.tags.map(t => TAG_NAMES[t] || t).join(" \u00b7 ") : "Joined " + ago(u.created)}</small></div>
     </li>`;
   }
@@ -275,12 +276,12 @@
         <div class="mast-bg" aria-hidden="true"></div>
         <div class="wrap mast-in">
           <p class="kicker">Welloby community</p>
-          <h1>${u ? "Welcome back, " + esc(u.name) : "Claim your name"}</h1>
-          <p class="mast-lede">Clans, players and the board. Put your in-game name on the record, raise a banner for your crew and tell everyone who griefed whom.</p>
+          <h1>${u ? "Welcome back, " + esc(u.name) : "Join the community"}</h1>
+          <p class="mast-lede">Clans, players and the board. Make an account, raise a banner for your crew and tell everyone who griefed whom.</p>
           <div class="stats">${statTiles(d.stats || {})}</div>
           <p class="mast-acts">${u
             ? `<a class="btn btn-lava btn-l" href="#/new">${icon("i-plus")}Start a thread</a><a class="btn btn-line btn-l" href="${WC.userHref(u)}">${head(u, 22)}Your profile</a>`
-            : `<a class="btn btn-lava btn-l" href="#/register">Claim your name</a><a class="btn btn-line btn-l" href="#/login">Sign in</a>`}</p>
+            : `<a class="btn btn-lava btn-l" href="#/register">Create an account</a><a class="btn btn-line btn-l" href="#/login">Sign in</a>`}</p>
         </div>
       </section>
       <div class="wrap home"><div class="home-col">
@@ -906,7 +907,7 @@
     </li>`;
   }
   async function castVote(btn) {
-    if (!me()) { toast("Sign in to vote. Your vote counts for your in-game name."); go("#/login?next=" + enc(location.hash)); return; }
+    if (!me()) { toast("Sign in to vote."); go("#/login?next=" + enc(location.hash)); return; }
     if (btn.disabled) return;
     btn.disabled = true;
     const label = btn.textContent;
@@ -918,7 +919,7 @@
       if (box) for (const n of $$("[data-vcount]", box)) n.textContent = fmt(r.votes.month);
       btn.textContent = "Voted";
       btn.classList.add("voted");
-      toast(r.reward ? "Vote counted. Your reward is on its way in game." : "Vote counted. Thanks!");
+      toast(r.reward ? "Vote counted. Your reward is on its way in game." : r.needIgn ? "Vote counted. Add your in-game name in Settings to get the reward in game." : "Vote counted. Thanks!");
     } catch (err) {
       toast(err.message);
       if (err.code === "voted") { btn.textContent = "Voted"; btn.classList.add("voted"); } else { btn.disabled = false; btn.textContent = label; }
@@ -1206,6 +1207,7 @@
           <div class="pf-id">
             ${crumbs([["#/players", "Players"], [null, u.name]])}
             <h1>${esc(u.name)}</h1>
+            ${u.ign ? `<p class="pf-ign">In game <b>${esc(u.ign)}</b>${u.verified ? " <small>checked by the staff</small>" : ""}</p>` : ""}
             <p class="pf-badges">${badges(u) || ""}${u.role === "player" && !u.supporter && !u.verified ? '<span class="muted">Player</span>' : ""}</p>
             ${u.clan ? `<a class="pf-clan" href="#/c/${enc(u.clan.tag)}">${banner(u.clan.banner, "bnr-s")}<span><b>${esc(u.clan.name)}</b><small>${ROLE_NAMES[u.clan.role]} of [${esc(u.clan.tag)}]</small></span></a>` : '<p class="muted">No clan. A lone wolf, for now.</p>'}
             ${u.tags.length ? `<ul class="tags">${u.tags.map(t => `<li>${esc(TAG_NAMES[t] || t)}</li>`).join("")}</ul>` : ""}
@@ -1264,28 +1266,141 @@
   });
 
   /* ======================================================== ACCOUNTS */
-  const nextHash = q => { const n = q.get("next"); return n && n.startsWith("#/") && !/^#\/(login|register)/.test(n) ? n : null; };
+  const nextHash = q => { const n = q.get("next"); return n && n.startsWith("#/") && !/^#\/(login|register|auth|forgot|reset|verify)/.test(n) ? n : null; };
+  const health = () => WC.health() || {};
+  const sess = {
+    get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { if (v) sessionStorage.setItem(k, v); else sessionStorage.removeItem(k); } catch (e) { /* private mode */ } },
+  };
+  /* one-time codes from emails and sign-ins come in the address; this drops them from it and the history */
+  const forget = path => { try { history.replaceState(null, "", location.pathname + location.search + "#" + path); } catch (e) { /* ignore */ } };
+  /* the providers' own marks, as their sign-in button guidelines ask */
+  const BRANDS = {
+    google: { name: "Google", svg: '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>' },
+    discord: { name: "Discord", svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>' },
+    facebook: { name: "Facebook", svg: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z"/></svg>' },
+  };
+  const KEY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 12 20 3m-3.5 3.5 2.5 2.5m-5.5.5 2 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const EYE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+  const providers = () => (health().providers || []).filter(p => BRANDS[p]);
+  const brandName = p => (BRANDS[p] || { name: "that site" }).name;
+
+  function socialButtons(mode, label) {
+    const ps = providers();
+    if (!ps.length) return "";
+    return `<div class="social-in">${ps.map(p => `<button type="button" class="btn-social is-${p}" data-social="${p}" data-mode="${mode}">${BRANDS[p].svg}<span>Continue with ${BRANDS[p].name}</span></button>`).join("")}</div>
+      ${label ? `<p class="or-line"><span>${esc(label)}</span></p>` : ""}`;
+  }
+  /* the button sends the browser to the provider; it comes back to #/auth */
+  function onSocial(next) {
+    on("click", "[data-social]", (e, b) => busy(b, async () => {
+      try {
+        const r = await api("/auth/oauth/start", { body: { provider: b.dataset.social, mode: b.dataset.mode, back: location.origin + location.pathname } });
+        sess.set("welloby.next", next || "");
+        location.href = r.url;
+        await new Promise(res => setTimeout(res, 5000));   // stays busy while the browser leaves
+      } catch (err) { toast(err.message); }
+    }));
+  }
+  /* a password box with a show/hide button */
+  const pwBox = (name, ac, attrs) => `<span class="pw"><input name="${name}" type="password" autocomplete="${ac}" maxlength="200" ${attrs || ""}><button type="button" class="pw-eye" data-pweye aria-label="Show password" aria-pressed="false">${EYE}</button></span>`;
+  /* a new password and the same again, with the strength bar and a match note */
+  const newPwFields = (first, second, required = true, names = ["password", "password2"]) => `
+    <label class="fld"><span>${first}</span>${pwBox(names[0], "new-password", (required ? "required " : "") + 'minlength="8" data-pw')}
+      <span class="pwmeter" aria-hidden="true"><i data-pwbar></i></span><small class="fld-note" data-pwnote aria-live="polite"></small></label>
+    <label class="fld"><span>${second}</span>${pwBox(names[1], "new-password", (required ? "required " : "") + 'minlength="8" data-pw2')}
+      <small class="fld-note" data-pw2note aria-live="polite"></small></label>`;
+  function pwHandlers() {
+    on("click", "[data-pweye]", (e, b) => {
+      const i = b.parentElement.querySelector("input"), reveal = i.type === "password";
+      i.type = reveal ? "text" : "password";
+      b.setAttribute("aria-pressed", String(reveal));
+      b.setAttribute("aria-label", reveal ? "Hide password" : "Show password");
+    });
+    const match = f => {
+      const a = $("[data-pw]", f), b = $("[data-pw2]", f), n = $("[data-pw2note]", f);
+      if (!a || !b || !n) return;
+      if (!b.value) { n.textContent = ""; n.className = "fld-note"; return; }
+      const same = a.value === b.value;
+      n.textContent = same ? "They match." : "They don't match yet.";
+      n.className = "fld-note " + (same ? "good" : "bad");
+    };
+    on("input", "[data-pw]", (e, i) => {
+      const v = i.value, f = i.form;
+      let s = 0;
+      if (v.length >= 8) s++; if (v.length >= 12) s++; if (/[A-Z]/.test(v) && /[a-z]/.test(v)) s++; if (/[\d\W_]/.test(v)) s++;
+      if (/^(password|12345678|qwerty|minecraft)/i.test(v)) s = 1;
+      $("[data-pwbar]", f).style.setProperty("--s", s);
+      $("[data-pwnote]", f).textContent = v ? ["Too short", "Weak", "Okay", "Good", "Strong"][s] : "";
+      match(f);
+    });
+    on("input", "[data-pw2]", (e, i) => match(i.form));
+  }
+  /* The nickname is the name on the site and what you sign in with; the in-game name is optional
+     and is where vote rewards go. Kept in step with NICK_RE and NAME_RE in worker.js. */
+  const NICK_OK = /^[\p{L}\p{N}_.-]{3,20}$/u, IGN_OK = /^\.?[A-Za-z0-9_](?:[A-Za-z0-9_ ]{1,14})[A-Za-z0-9_]$/;
+  const nickField = v => `<label class="fld"><span>Nickname <small>your name on the site, and what you sign in with</small></span>
+      <input name="name" value="${esc(v || "")}" autocomplete="username" required minlength="3" maxlength="20" spellcheck="false" autocapitalize="off" data-name>
+      <small class="fld-note" data-namenote aria-live="polite"></small></label>`;
+  const ignField = v => `<label class="fld"><span>In-game name <small>optional, add it later if you like</small></span>
+      <input name="ign" value="${esc(v || "")}" maxlength="17" spellcheck="false" autocapitalize="off" autocomplete="off" data-ign>
+      <small class="fld-note" data-ignnote aria-live="polite">Your Minecraft name, so vote rewards reach you and players know who you are in game.</small></label>`;
+  /* live "is this nickname free" note and the block face that goes with it */
+  function nameChecker() {
+    let nameT = 0;
+    on("input", "[data-name]", (e, i) => {
+      const v = i.value.trim(), note = $("[data-namenote]", app), face = $("[data-face]", app);
+      if (face) face.innerHTML = head({ name: v || "?" }, 120, "hd-xl");
+      clearTimeout(nameT);
+      note.textContent = ""; note.className = "fld-note";
+      if (!v) return;
+      if (!NICK_OK.test(v)) { note.textContent = "3 to 20 letters, numbers, _ . or -, no spaces."; return; }
+      nameT = setTimeout(async () => {
+        try { await api("/users/" + enc(v)); note.textContent = "That nickname is taken."; note.className = "fld-note bad"; }
+        catch (err) { if (err.status === 404) { note.textContent = "Free. It's yours if you want it."; note.className = "fld-note good"; } }
+      }, 350);
+    });
+    on("input", "[data-ign]", (e, i) => {
+      const v = i.value.trim(), note = $("[data-ignnote]", i.form);
+      if (!v) { note.textContent = "Your Minecraft name, so vote rewards reach you and players know who you are in game."; note.className = "fld-note"; return; }
+      const ok = IGN_OK.test(v) && !/ {2}/.test(v);
+      note.textContent = ok ? "Looks like a Minecraft name." : "Minecraft names are 3 to 16 letters, numbers or underscores.";
+      note.className = "fld-note " + (ok ? "good" : "bad");
+    });
+  }
+  /* the terms tick box on both sign-up forms (worded by the advertising session, 20 Nov 2026) */
+  const termsBox = () => `<label class="fld-check"><input type="checkbox" name="terms" required><span>I agree to the <a href="terms.html" target="_blank" rel="noopener">Welloby terms</a>, including that staff can ban anyone for any reason and that Welloby isn't responsible for what I lose.</span></label>`;
+  /* a one-message card on the sign-in backdrop */
+  const authCard = (kicker, title, html, links) => `<section class="authpage"><div class="authbg" aria-hidden="true"></div>
+    <div class="authcard notch"><p class="kicker">${esc(kicker)}</p><h1>${esc(title)}</h1><div class="authmsg">${html}</div>
+    ${links && links.length ? `<p class="form-acts">${links.map(([h, l], i) => `<a class="btn ${i ? "btn-line" : "btn-lava"}" href="${h}">${esc(l)}</a>`).join("")}</p>` : ""}</div></section>`;
+  const toWelcome = (mailSent, next) => go("#/welcome?" + new URLSearchParams(Object.assign({ mail: mailSent ? "1" : "0" }, next ? { next } : {})));
+
   page(/^\/login$/, async (m, q) => {
     if (me()) { go(nextHash(q) || "#/"); return; }
+    const next = nextHash(q);
     show(`
       <section class="authpage"><div class="authbg" aria-hidden="true"></div>
         <form class="authcard notch" data-login>
           <p class="kicker">Welcome back</p><h1>Sign in</h1>
-          <label class="fld"><span>In-game name</span><input name="name" autocomplete="username" required maxlength="17" spellcheck="false" autocapitalize="off"></label>
-          <label class="fld"><span>Password</span><input name="password" type="password" autocomplete="current-password" required maxlength="200"></label>
+          ${socialButtons("login", "or with your name or email")}
+          <label class="fld"><span>Nickname or email</span><input name="name" autocomplete="username" required maxlength="254" spellcheck="false" autocapitalize="off"></label>
+          <label class="fld"><span>Password</span>${pwBox("password", "current-password", "required")}</label>
+          <p class="fld-aside"><a href="#/forgot">Forgot your password?</a></p>
           ${errBox()}
           <button class="btn btn-lava btn-l" type="submit">Sign in</button>
-          <p class="authalt">New here? <a href="#/register${q.get("next") ? "?next=" + enc(q.get("next")) : ""}">Claim your name</a></p>
-          <p class="fine">Forgot your password? There's no email reset. Ask an admin on Discord and they'll give you a temporary one.</p>
+          <p class="authalt">New here? <a href="#/register${next ? "?next=" + enc(next) : ""}">Create an account</a></p>
         </form>
       </section>`, "Sign in", () => $("input[name=name]", app).focus());
+    onSocial(next);
+    pwHandlers();
     on("submit", "[data-login]", (e, f) => busy($("button[type=submit]", f), async () => {
       formErr(f, "");
       try {
         const r = await api("/auth/login", { body: { name: f.name.value.trim(), password: f.password.value } });
         WC.setSession(r.token, r.user);
         toast("Signed in as " + r.user.name);
-        go(nextHash(q) || "#/");
+        go(next || "#/");
       } catch (err) { formErr(f, err.message); f.password.select(); }
     }));
   });
@@ -1305,72 +1420,221 @@
   }
   page(/^\/register$/, async (m, q) => {
     if (me()) { go("#/"); return; }
-    const site = (WC.health() || {}).turnstile || "";
+    const site = health().turnstile || "";
+    const next = nextHash(q);
     let tsToken = "";
     show(`
       <section class="authpage"><div class="authbg" aria-hidden="true"></div>
         <form class="authcard authcard-wide notch" data-register>
-          <div class="authface"><div class="authface-head" data-face>${head({ name: "?" }, 120, "hd-xl")}</div><p class="muted" data-facehint>Your face is made from your name.</p></div>
+          <div class="authface"><div class="authface-head" data-face>${head({ name: "?" }, 120, "hd-xl")}</div><p class="muted">Your face is made from your name.</p></div>
           <div class="authform">
-            <p class="kicker">Free, no email needed</p><h1>Claim your name</h1>
-            <label class="fld"><span>In-game name <small>exactly as you use it on the server</small></span>
-              <input name="name" autocomplete="username" required minlength="3" maxlength="17" spellcheck="false" autocapitalize="off" data-name>
-              <small class="fld-note" data-namenote aria-live="polite"></small></label>
-            <label class="fld"><span>Password <small>at least 8 characters, not your in-game one</small></span>
-              <input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="200" data-pw>
-              <span class="pwmeter" aria-hidden="true"><i data-pwbar></i></span><small class="fld-note" data-pwnote aria-live="polite"></small></label>
+            <p class="kicker">Free, takes a minute</p><h1>Create your account</h1>
+            ${socialButtons("login", "or sign up with email")}
+            ${nickField("")}
+            <label class="fld"><span>Email <small>Gmail or any address. Only for getting back in, never shown to anyone</small></span>
+              <input name="email" type="email" inputmode="email" autocomplete="email" required maxlength="254" spellcheck="false" autocapitalize="off"></label>
+            ${ignField("")}
+            ${newPwFields("Password <small>at least 8 characters, not your in-game one</small>", "Type the password again")}
             <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
             ${site ? '<div class="ts" data-ts></div>' : ""}
-            <label class="fld-check"><input type="checkbox" name="terms" required><span>I agree to the <a href="terms.html" target="_blank" rel="noopener">Welloby terms</a>, including that staff can ban anyone for any reason and that Welloby isn't responsible for what I lose.</span></label>
+            ${termsBox()}
             ${errBox()}
-            <button class="btn btn-lava btn-l" type="submit">Claim it</button>
-            <p class="authalt">Already have an account? <a href="#/login${q.get("next") ? "?next=" + enc(q.get("next")) : ""}">Sign in</a></p>
-            <p class="fine">The name is first come, first served. If someone took yours, tell the staff on Discord. We store your name, a scrambled copy of your password and what you post. Nothing else.</p>
+            <button class="btn btn-lava btn-l" type="submit">Create account</button>
+            <p class="authalt">Already have an account? <a href="#/login${next ? "?next=" + enc(next) : ""}">Sign in</a></p>
+            <p class="fine">Nicknames are first come, first served. We keep your nickname, in-game name, email, a scrambled copy of your password and what you post. <a href="privacy.html">How we handle it</a>.</p>
           </div>
         </form>
-      </section>`, "Claim your name", () => { $("[data-name]", app).focus(); turnstile($("[data-ts]", app), site, t => { tsToken = t; }); });
-    let nameT = 0;
-    on("input", "[data-name]", (e, i) => {
-      const v = i.value.trim(), note = $("[data-namenote]", app);
-      $("[data-face]", app).innerHTML = head({ name: v || "?" }, 120, "hd-xl");
-      clearTimeout(nameT);
-      note.textContent = ""; note.className = "fld-note";
-      if (!v) return;
-      if (!/^\.?[A-Za-z0-9_](?:[A-Za-z0-9_ ]{1,14})[A-Za-z0-9_]$/.test(v)) { note.textContent = "3 to 16 letters, numbers or underscores."; return; }
-      nameT = setTimeout(async () => {
-        try { await api("/users/" + enc(v)); note.textContent = "That name is taken."; note.className = "fld-note bad"; }
-        catch (err) { if (err.status === 404) { note.textContent = "Free. It's yours if you want it."; note.className = "fld-note good"; } }
-      }, 350);
-    });
-    on("input", "[data-pw]", (e, i) => {
-      const v = i.value;
-      let s = 0;
-      if (v.length >= 8) s++; if (v.length >= 12) s++; if (/[A-Z]/.test(v) && /[a-z]/.test(v)) s++; if (/[\d\W_]/.test(v)) s++;
-      if (/^(password|12345678|qwerty|minecraft)/i.test(v)) s = 1;
-      $("[data-pwbar]", app).style.setProperty("--s", s);
-      $("[data-pwnote]", app).textContent = v ? ["Too short", "Weak", "Okay", "Good", "Strong"][s] : "";
-    });
+      </section>`, "Create your account", () => { $("[data-name]", app).focus(); turnstile($("[data-ts]", app), site, t => { tsToken = t; }); });
+    onSocial(next);
+    pwHandlers();
+    nameChecker();
     on("submit", "[data-register]", (e, f) => busy($("button[type=submit]", f), async () => {
       formErr(f, "");
+      if (f.password.value !== f.password2.value) { formErr(f, "The two passwords don't match."); f.password2.focus(); return; }
       if (!f.terms.checked) { formErr(f, "Tick the box to accept the terms first."); return; }
       try {
-        const r = await api("/auth/register", { body: { name: f.name.value.trim(), password: f.password.value, website: f.website.value, turnstile: tsToken } });
+        const r = await api("/auth/register", { body: { name: f.name.value.trim(), email: f.email.value.trim(), ign: f.ign.value.trim(), password: f.password.value, password2: f.password2.value, website: f.website.value, turnstile: tsToken } });
         WC.acceptTerms();
         WC.setSession(r.token, r.user);
-        go("#/welcome" + (nextHash(q) ? "?next=" + enc(nextHash(q)) : ""));
+        toWelcome(r.mailSent, next);
       } catch (err) { formErr(f, err.message); if (window.turnstile && site) window.turnstile.reset(); }
     }));
+  });
+
+  /* back from Google, Discord or Facebook: sign in, finish a new account, or say what went wrong */
+  page(/^\/auth$/, async (m, q, stale) => {
+    const fresh = q.get("t"), e = q.get("e"), linked = q.get("linked"), p = q.get("p");
+    if (fresh || e || linked) forget("/auth");
+    if (fresh) sess.set("welloby.signup", fresh);
+    if (linked) {
+      sess.set("welloby.signup", "");
+      await WC.refreshMe();
+      toast(brandName(linked) + " is connected. You can sign in with it now.");
+      go("#/settings");
+      return;
+    }
+    const next = sess.get("welloby.next") || "";
+    const nextOk = next.startsWith("#/") ? next : "";
+    const back = me() ? [["#/settings", "Settings"], ["#/", "Community"]] : [["#/login", "Sign in"], ["#/register", "Create an account"]];
+    if (e) {
+      sess.set("welloby.signup", "");
+      const pn = brandName(p);
+      const why = {
+        expired: "That sign-in took too long or was already used. Try the button again.",
+        cancelled: `You cancelled at ${pn}, so nothing changed.`,
+        failed: `${pn} didn't let us finish. Try again in a minute.`,
+        taken: `That ${pn} account is already connected to a different Welloby account.`,
+        other: `Your Welloby account already has a different ${pn} account connected. Disconnect it in Settings first.`,
+        emailtaken: `There's already a Welloby account with the email from your ${pn} account. Sign in to it with your name or email and password, then connect ${pn} in Settings.`,
+        banned: "That Welloby account is banned.",
+      };
+      show(authCard("Sign-in", "That didn't work", `<p>${esc(why[e] || why.failed)}</p>`, back), "Sign in");
+      return;
+    }
+    const t = fresh || sess.get("welloby.signup") || "";
+    if (!t) { go(me() ? "#/settings" : "#/login"); return; }
+    let r;
+    try { r = await api("/auth/ticket", { body: { t } }); }
+    catch (err) {
+      sess.set("welloby.signup", "");
+      if (!stale()) show(authCard("Sign-in", "That didn't work", `<p>${esc(err.message)}</p>`, back), "Sign in");
+      return;
+    }
+    if (stale()) return;
+    if (r.token) {
+      sess.set("welloby.signup", ""); sess.set("welloby.next", "");
+      WC.setSession(r.token, r.user);
+      toast("Signed in as " + r.user.name);
+      go(nextOk || "#/");
+      return;
+    }
+    const s = r.signup || {};
+    const pn = esc(s.providerName || brandName(s.provider));
+    show(`
+      <section class="authpage"><div class="authbg" aria-hidden="true"></div>
+        <form class="authcard authcard-wide notch" data-finish>
+          <div class="authface"><div class="authface-head" data-face>${head({ name: s.suggest || "?" }, 120, "hd-xl")}</div><p class="muted">Your face is made from your name.</p></div>
+          <div class="authform">
+            <p class="kicker">Signed in with ${pn}</p><h1>Pick a nickname</h1>
+            <p class="authlede">${s.email ? `Your account will use <b>${esc(s.email)}</b>${s.emailVerified ? "" : ", and we'll send a link to confirm it"}.` : `${pn} didn't share an email, so add one. It's how you get back in if you ever lose access.`} Last step: your name on the site.</p>
+            ${nickField(s.suggest || "")}
+            ${s.email ? "" : `<label class="fld"><span>Email</span><input name="email" type="email" inputmode="email" autocomplete="email" required maxlength="254" spellcheck="false" autocapitalize="off"></label>`}
+            ${ignField("")}
+            <details class="pw-opt"><summary>Add a password too <small>optional, so you can also sign in with your nickname</small></summary>
+              ${newPwFields("Password <small>at least 8 characters</small>", "Type it again", false)}</details>
+            ${termsBox()}
+            ${errBox()}
+            <button class="btn btn-lava btn-l" type="submit">Create account</button>
+            <p class="fine">We keep your name, your email, which ${pn} account signs you in, and what you post. Never your ${pn} password. <a href="privacy.html">How we handle it</a>.</p>
+          </div>
+        </form>
+      </section>`, "Pick a nickname", () => $("[data-name]", app).focus());
+    pwHandlers();
+    nameChecker();
+    on("submit", "[data-finish]", (ev, f) => busy($("button[type=submit]", f), async () => {
+      formErr(f, "");
+      const pw = f.password.value;
+      if (pw && pw !== f.password2.value) { formErr(f, "The two passwords don't match."); return; }
+      if (!f.terms.checked) { formErr(f, "Tick the box to accept the terms first."); return; }
+      const out = { name: f.name.value.trim(), ign: f.ign.value.trim(), social: t };
+      if (f.email) out.email = f.email.value.trim();
+      if (pw) { out.password = pw; out.password2 = f.password2.value; }
+      try {
+        const r2 = await api("/auth/register", { body: out });
+        sess.set("welloby.signup", ""); sess.set("welloby.next", "");
+        WC.acceptTerms();
+        WC.setSession(r2.token, r2.user);
+        toWelcome(r2.mailSent, nextOk);
+      } catch (err) { formErr(f, err.message); }
+    }));
+  });
+
+  page(/^\/forgot$/, async (m, q) => {
+    const off = health().mail === false;
+    show(`
+      <section class="authpage"><div class="authbg" aria-hidden="true"></div>
+        <form class="authcard notch" data-forgot>
+          <p class="kicker">Locked out?</p><h1>Reset your password</h1>
+          ${off ? '<p class="authlede">Reset emails aren\'t switched on yet. Ask an admin on <a href="https://discord.gg/cwHKDtXQWD" target="_blank" rel="noopener">Discord</a> for a temporary password.</p>'
+            : `<p class="authlede">Enter your nickname or email. If the account has a confirmed email, we'll send a link to choose a new password.</p>
+          <label class="fld"><span>Nickname or email</span><input name="login" required maxlength="254" autocomplete="username" spellcheck="false" autocapitalize="off"></label>
+          ${errBox()}
+          <button class="btn btn-lava btn-l" type="submit">Send the link</button>`}
+          <p class="authalt"><a href="#/login">Back to sign in</a></p>
+          ${off ? "" : '<p class="fine">No confirmed email on the account? Ask an admin on Discord for a temporary password.</p>'}
+        </form>
+      </section>`, "Reset your password", () => { const i = $("input[name=login]", app); if (i) i.focus(); });
+    on("submit", "[data-forgot]", (e, f) => busy($("button[type=submit]", f), async () => {
+      formErr(f, "");
+      try {
+        const r = await api("/auth/forgot", { body: { login: f.login.value.trim() } });
+        show(authCard("Check your email", "Link on its way", `<p>${esc(r.message)}</p>`, [["#/login", "Back to sign in"]]), "Reset your password");
+      } catch (err) { formErr(f, err.message); }
+    }));
+  });
+
+  page(/^\/reset$/, async (m, q) => {
+    const fresh = q.get("t");
+    if (fresh) { sess.set("welloby.reset", fresh); forget("/reset"); }
+    const t = fresh || sess.get("welloby.reset") || "";
+    if (!t) { show(authCard("Reset your password", "That link isn't complete", "<p>Open the link from the email again, or ask for a new one.</p>", [["#/forgot", "Send a new link"], ["#/login", "Sign in"]]), "Reset your password"); return; }
+    show(`
+      <section class="authpage"><div class="authbg" aria-hidden="true"></div>
+        <form class="authcard notch" data-reset>
+          <p class="kicker">Almost back in</p><h1>New password</h1>
+          ${newPwFields("New password <small>at least 8 characters</small>", "Type it again")}
+          ${errBox()}
+          <button class="btn btn-lava btn-l" type="submit">Save and sign in</button>
+          <p class="fine">This signs you out on every other device.</p>
+        </form>
+      </section>`, "New password", () => $("input[name=password]", app).focus());
+    pwHandlers();
+    on("submit", "[data-reset]", (e, f) => busy($("button[type=submit]", f), async () => {
+      formErr(f, "");
+      if (f.password.value !== f.password2.value) { formErr(f, "The two passwords don't match."); return; }
+      try {
+        const r = await api("/auth/reset", { body: { t, password: f.password.value, password2: f.password2.value } });
+        sess.set("welloby.reset", "");
+        if (r.token) { WC.setSession(r.token, r.user); toast("Password changed. You're signed in."); go("#/"); }
+        else show(authCard("Password changed", "Done", "<p>The password is changed, but this account is banned, so it can't sign in.</p>", [["#/", "Community"]]), "Password changed");
+      } catch (err) {
+        if (err.code === "token") {
+          sess.set("welloby.reset", "");
+          show(authCard("Reset your password", "That link has run out", `<p>${esc(err.message)}</p>`, [["#/forgot", "Send a new link"]]), "Reset your password");
+        } else formErr(f, err.message);
+      }
+    }));
+  });
+
+  page(/^\/verify$/, async (m, q, stale) => {
+    const t = q.get("t");
+    if (t) forget("/verify");
+    const out = me() ? [["#/settings", "Back to Settings"], ["#/", "Community"]] : [["#/login", "Sign in"], ["#/", "Community"]];
+    if (!t) { show(authCard("Confirm your email", "Open the link again", "<p>This page needs the link from the email. Open it again, or send a new one from Settings.</p>", out), "Confirm your email"); return; }
+    try {
+      const r = await api("/auth/verify", { body: { t } });
+      if (stale()) return;
+      if (me()) await WC.refreshMe();
+      show(authCard("All set", "Email confirmed", `<p><b>${esc(r.email)}</b> is ${r.field === "recovery" ? "your recovery email now" : "confirmed"}. If you ever forget your password, a reset link can go there.</p>`, out),
+        "Email confirmed", () => setTimeout(() => burstAt($("h1", app), 30), 200));
+    } catch (err) {
+      if (!stale()) show(authCard("Confirm your email", "That link didn't work", `<p>${esc(err.message)}</p>`, out), "Confirm your email");
+    }
   });
 
   page(/^\/welcome$/, async (m, q) => {
     const u = me();
     if (!u) { go("#/register"); return; }
+    const a = u.account || {};
+    const mailNote = a.email && !a.emailVerified
+      ? `<p class="mail-note">${q.get("mail") === "1" ? `We sent a link to <b>${esc(a.email)}</b>. Open it to confirm your email; it's how you get back in if you ever forget your password.` : `Your email isn't confirmed yet. You can send the link from <a href="#/settings">Settings</a>.`}</p>` : "";
     show(`
       <section class="authpage welcome"><div class="authbg" aria-hidden="true"></div>
         <div class="welcomecard">
           <div class="welcome-face" data-face>${head(u, 150, "hd-xl")}</div>
           <p class="kicker">It's official</p><h1>Welcome, ${esc(u.name)}</h1>
           <p class="mast-lede">Your name is on the record. Here's what to do next.</p>
+          ${mailNote}
           <ul class="next" data-stagger>
             <li><a href="#/settings" class="glow">${icon("i-edit")}<b>Set up your profile</b><span>Bio, playstyle, when you started, and a new face if you don't like this one.</span></a></li>
             <li><a href="#/clans" class="glow">${icon("i-users")}<b>Find a clan</b><span>Or found your own and design its banner.</span></a></li>
@@ -1386,36 +1650,78 @@
     if (!u0) { show(`<section class="pagehead"><div class="wrap"><h1>Settings</h1></div></section><div class="wrap narrow">${needSignIn("to change your settings")}</div>`, "Settings"); return; }
     const u = await WC.refreshMe();
     if (stale() || !u) return;
+    const a = Object.assign({ email: "", emailVerified: false, recovery: "", recoveryVerified: false, hasPassword: true, linked: [] }, u.account || {});
+    const mailOn = health().mail !== false;
+    const ps = providers();
     let avatar = u.avatar || 0;
     const months = [];
     for (let d = new Date(Date.UTC(2026, 8, 1)); d <= new Date(); d.setUTCMonth(d.getUTCMonth() + 1)) months.push(d.toISOString().slice(0, 7));
+    const chip = ok => ok ? '<span class="chip chip-ok">Confirmed</span>' : '<span class="chip chip-warn">Not confirmed</span>';
+    const resend = field => mailOn ? ` <button type="button" class="link" data-resend="${field}">Send the link again</button>` : " Confirmation emails aren't switched on yet.";
+    const rows = [...new Set([...ps, ...a.linked.map(l => l.provider)])].filter(p => BRANDS[p]);
+    const linkedRow = p => {
+      const l = a.linked.find(x => x.provider === p);
+      return `<li><span class="lk-ico is-${p}">${BRANDS[p].svg}</span><div><b>${BRANDS[p].name}</b><small>${l ? "Connected" + (l.name ? " as " + esc(l.name) : "") : "Not connected"}</small></div>
+        ${l ? `<button type="button" class="link danger" data-unlink="${p}">Disconnect</button>` : ps.includes(p) ? `<button type="button" class="btn btn-line btn-s" data-social="${p}" data-mode="link">Connect</button>` : ""}</li>`;
+    };
+    const via = a.linked.map(l => brandName(l.provider)).join(" or ") || "another site";
     show(`
       <section class="pagehead"><div class="wrap"><p class="kicker">${esc(u.name)}</p><h1>Settings</h1></div></section>
       <div class="wrap settings">
-        <form class="card form" data-profile>
-          <h2>Profile</h2>
-          <div class="facepick"><div data-face>${head(u, 112, "hd-xl")}</div><div><p>Your face is made from your name. Roll a new one until it looks like you.</p>
-            <p><button type="button" class="btn btn-ink btn-s" data-reroll>${icon("i-dice")}New face</button> <button type="button" class="btn btn-line btn-s" data-original>Original</button></p></div></div>
-          <label class="fld"><span>Bio <small>500 characters, formatting works</small></span><textarea name="bio" rows="4" maxlength="500">${esc(u.bio)}</textarea></label>
-          <fieldset class="fld"><legend>Playstyle <small>pick up to three</small></legend><div class="tagpick">${Object.entries(TAG_NAMES).map(([k, l]) => `<label><input type="checkbox" name="tags" value="${k}"${u.tags.includes(k) ? " checked" : ""}><span>${l}</span></label>`).join("")}</div></fieldset>
-          <label class="fld"><span>Playing since</span><select name="since"><option value="">Not saying</option>${months.map(mo => `<option value="${mo}"${u.since === mo ? " selected" : ""}>${new Date(mo + "-01T00:00:00Z").toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })}</option>`).join("")}</select></label>
-          ${errBox()}
-          <p class="form-acts"><button class="btn btn-lava" type="submit">Save profile</button><a class="btn btn-line" href="${WC.userHref(u)}">View profile</a></p>
-        </form>
+        <div class="settings-main">
+          <form class="card form" data-profile>
+            <h2>Profile</h2>
+            <div class="facepick"><div data-face>${head(u, 112, "hd-xl")}</div><div><p>Your face is made from your name. Roll a new one until it looks like you.</p>
+              <p><button type="button" class="btn btn-ink btn-s" data-reroll>${icon("i-dice")}New face</button> <button type="button" class="btn btn-line btn-s" data-original>Original</button></p></div></div>
+            <label class="fld"><span>In-game name <small>optional; vote rewards go here</small></span>
+              <input name="ign" value="${esc(u.ign || "")}" maxlength="17" spellcheck="false" autocapitalize="off" autocomplete="off" data-ign>
+              <small class="fld-note" data-ignnote aria-live="polite">${u.ign ? (u.verified ? "Checked by the staff." : "The staff haven't checked it yet. Changing it means they check again.") : "Your Minecraft name, so vote rewards reach you and players know who you are in game."}</small></label>
+            <label class="fld"><span>Bio <small>500 characters, formatting works</small></span><textarea name="bio" rows="4" maxlength="500">${esc(u.bio)}</textarea></label>
+            <fieldset class="fld"><legend>Playstyle <small>pick up to three</small></legend><div class="tagpick">${Object.entries(TAG_NAMES).map(([k, l]) => `<label><input type="checkbox" name="tags" value="${k}"${u.tags.includes(k) ? " checked" : ""}><span>${l}</span></label>`).join("")}</div></fieldset>
+            <label class="fld"><span>Playing since</span><select name="since"><option value="">Not saying</option>${months.map(mo => `<option value="${mo}"${u.since === mo ? " selected" : ""}>${new Date(mo + "-01T00:00:00Z").toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })}</option>`).join("")}</select></label>
+            ${errBox()}
+            <p class="form-acts"><button class="btn btn-lava" type="submit">Save profile</button><a class="btn btn-line" href="${WC.userHref(u)}">View profile</a></p>
+          </form>
+          <form class="card form" data-email id="email"><h2>Email</h2>
+            ${a.email ? `<p class="acct-line"><b>${esc(a.email)}</b>${chip(a.emailVerified)}</p>${a.emailVerified ? "" : `<p class="fine">Open the link we sent to confirm it.${resend("email")}</p>`}`
+              : '<p class="mail-note">Add an email so you can get back in if you ever forget your password.</p>'}
+            <label class="fld"><span>${a.email ? "Change it to" : "Your email"}</span><input name="email" type="email" inputmode="email" autocomplete="email" required maxlength="254" spellcheck="false" autocapitalize="off"></label>
+            ${a.hasPassword ? '<label class="fld"><span>Your password <small>to show it\'s you</small></span><input name="password" type="password" autocomplete="current-password" required maxlength="200"></label>' : ""}
+            ${errBox()}<p class="form-acts"><button class="btn btn-ink" type="submit">${a.email ? "Change email" : "Add email"}</button></p>
+            <p class="fine">Only you see it. Password reset links go here.</p></form>
+          <form class="card form" data-recovery><h2>Recovery email <small class="h-aside">optional</small></h2>
+            ${a.recovery ? `<p class="acct-line"><b>${esc(a.recovery)}</b>${chip(a.recoveryVerified)}</p>${a.recoveryVerified ? "" : `<p class="fine">Open the link we sent to confirm it.${resend("recovery")}</p>`}`
+              : '<p class="fine">A second address for reset links, in case you lose access to the first one.</p>'}
+            <label class="fld"><span>${a.recovery ? "Change it to" : "Recovery email"}</span><input name="email" type="email" inputmode="email" autocomplete="email" required maxlength="254" spellcheck="false" autocapitalize="off"></label>
+            ${errBox()}<p class="form-acts"><button class="btn btn-ink" type="submit">Save recovery email</button>${a.recovery ? '<button type="button" class="btn btn-line" data-recovery-off>Remove it</button>' : ""}</p></form>
+        </div>
         <div class="settings-side">
-          <form class="card form" data-password><h2>Password</h2>
-            <label class="fld"><span>Current password</span><input name="current" type="password" autocomplete="current-password" required></label>
-            <label class="fld"><span>New password</span><input name="next" type="password" autocomplete="new-password" minlength="8" required></label>
-            ${errBox()}<p class="form-acts"><button class="btn btn-ink" type="submit">Change password</button></p>
-            <p class="fine">Changing it signs you out everywhere else.</p></form>
+          <div class="card form"><h2>Sign-in methods</h2>
+            <ul class="linked">
+              <li><span class="lk-ico is-pass">${KEY_ICON}</span><div><b>Password</b><small>${a.hasPassword ? "Set. Sign in with your name or email." : "Not set yet. Add one below."}</small></div></li>
+              ${rows.map(linkedRow).join("")}
+            </ul>
+            <p class="fine">${ps.length ? "Connect one and you can sign in with a single click. The other site never sees your Welloby password." : "Signing in with Google, Discord or Facebook isn't switched on yet."}</p>
+          </div>
+          <form class="card form" data-password><h2>${a.hasPassword ? "Change password" : "Set a password"}</h2>
+            ${a.hasPassword ? `<label class="fld"><span>Current password</span>${pwBox("current", "current-password", "required")}</label>`
+              : `<p class="fine">You sign in with ${esc(via)}. A password lets you sign in with your name or email too.</p>`}
+            ${newPwFields("New password <small>at least 8 characters</small>", "Type it again", true, ["next", "next2"])}
+            ${errBox()}<p class="form-acts"><button class="btn btn-ink" type="submit">${a.hasPassword ? "Change password" : "Set password"}</button></p>
+            ${a.hasPassword ? '<p class="fine">Changing it signs you out everywhere else.</p>' : ""}</form>
           <div class="card form"><h2>Sessions</h2><p class="fine">Signed in on a computer that isn't yours?</p><p class="form-acts"><button type="button" class="btn btn-line" data-everywhere>Sign out everywhere</button></p></div>
           <form class="card form danger-zone" data-delete><h2>Delete account</h2>
-            <p class="fine">Your name, profile and clan role go. Your posts stay up as "Deleted player" so threads still make sense. If you lead a clan, the next officer takes over.</p>
-            <label class="fld"><span>Type your password to confirm</span><input name="password" type="password" autocomplete="current-password" required></label>
+            <p class="fine">Your name, email, profile, sign-ins and clan role go. Your posts stay up as "Deleted player" so threads still make sense. If you lead a clan, the next officer takes over.</p>
+            ${a.hasPassword ? '<label class="fld"><span>Type your password to confirm</span><input name="password" type="password" autocomplete="current-password" required></label>'
+              : `<label class="fld"><span>Type your nickname, ${esc(u.name)}, to confirm</span><input name="confirm" autocomplete="off" required spellcheck="false" autocapitalize="off"></label>`}
             ${errBox()}<p class="form-acts"><button class="btn btn-line btn-danger" type="submit">Delete my account</button></p></form>
         </div>
       </div>`, "Settings");
     const paintFace = () => { $("[data-face]", app).innerHTML = head({ name: u.name, avatar }, 112, "hd-xl"); };
+    const redraw = r => { if (r && r.user) WC.setSession(store.get("welloby.session"), r.user); route(); };
+    pwHandlers();
+    nameChecker();
+    onSocial("#/settings");
     on("click", "[data-reroll]", () => { avatar = (avatar + 1 + ((Math.random() * 50) | 0)) % 99999; paintFace(); });
     on("click", "[data-original]", () => { avatar = 0; paintFace(); });
     on("change", "[data-profile] input[name=tags]", (e, i) => {
@@ -1425,23 +1731,55 @@
     on("submit", "[data-profile]", (e, f) => busy($("button[type=submit]", f), async () => {
       formErr(f, "");
       try {
-        const r = await api("/me", { method: "PATCH", body: { bio: f.bio.value, tags: $$("input[name=tags]:checked", f).map(i => i.value), since: f.since.value, avatar } });
+        const r = await api("/me", { method: "PATCH", body: { bio: f.bio.value, tags: $$("input[name=tags]:checked", f).map(i => i.value), since: f.since.value, avatar, ign: f.ign.value.trim() } });
         WC.setSession(store.get("welloby.session"), r.user);
         toast("Profile saved");
+        if ((r.user.ign || "") !== (u.ign || "")) route();
       } catch (err) { formErr(f, err.message); }
     }));
+    on("submit", "[data-email]", (e, f) => busy($("button[type=submit]", f), async () => {
+      formErr(f, "");
+      try {
+        const r = await api("/me/email", { method: "PUT", body: { email: f.email.value.trim(), password: f.password ? f.password.value : "" } });
+        toast(r.mailSent ? "Saved. Check your inbox to confirm it." : "Email saved");
+        redraw(r);
+      } catch (err) { formErr(f, err.message); }
+    }));
+    on("submit", "[data-recovery]", (e, f) => busy($("button[type=submit]", f), async () => {
+      formErr(f, "");
+      try {
+        const r = await api("/me/recovery", { method: "PUT", body: { email: f.email.value.trim() } });
+        toast(r.mailSent ? "Saved. Check that inbox to confirm it." : "Recovery email saved");
+        redraw(r);
+      } catch (err) { formErr(f, err.message); }
+    }));
+    on("click", "[data-recovery-off]", (e, b) => twice(b, () => busy(b, async () => {
+      try { redraw(await api("/me/recovery", { method: "DELETE" })); toast("Recovery email removed"); } catch (err) { toast(err.message); }
+    }), "Click again to remove it"));
+    on("click", "[data-resend]", (e, b) => busy(b, async () => {
+      try { await api("/me/email/resend", { body: { field: b.dataset.resend } }); toast("Sent. Check your inbox, and the spam folder."); } catch (err) { toast(err.message); }
+    }));
+    on("click", "[data-unlink]", (e, b) => twice(b, () => busy(b, async () => {
+      try { redraw(await api("/me/identities/" + enc(b.dataset.unlink), { method: "DELETE" })); toast(brandName(b.dataset.unlink) + " disconnected"); } catch (err) { toast(err.message); }
+    }), "Click again to disconnect"));
     on("submit", "[data-password]", (e, f) => busy($("button[type=submit]", f), async () => {
       formErr(f, "");
-      try { await api("/me/password", { body: { current: f.current.value, next: f.next.value } }); f.reset(); toast("Password changed"); }
-      catch (err) { formErr(f, err.message); }
+      if (f.next.value !== f.next2.value) { formErr(f, "The two passwords don't match."); return; }
+      try {
+        const r = await api("/me/password", { body: { current: f.current ? f.current.value : "", next: f.next.value, next2: f.next2.value } });
+        toast(a.hasPassword ? "Password changed" : "Password set. You can sign in with it now.");
+        redraw(r);
+      } catch (err) { formErr(f, err.message); }
     }));
     on("click", "[data-everywhere]", (e, b) => twice(b, () => busy(b, async () => { await WC.signOut(true); toast("Signed out everywhere"); go("#/"); }), "Click again to sign out everywhere"));
     on("submit", "[data-delete]", (e, f) => {
       const b = $("button[type=submit]", f);
       twice(b, () => busy(b, async () => {
         formErr(f, "");
-        try { await api("/me", { method: "DELETE", body: { password: f.password.value } }); WC.setSession(null, null); toast("Your account is deleted"); go("#/"); }
-        catch (err) { formErr(f, err.message); }
+        try {
+          await api("/me", { method: "DELETE", body: f.password ? { password: f.password.value } : { confirm: f.confirm.value } });
+          WC.setSession(null, null); toast("Your account is deleted"); go("#/");
+        } catch (err) { formErr(f, err.message); }
       }), "Click again to delete forever");
     });
   });
@@ -1467,13 +1805,13 @@
       if (stale()) return;
       body = `<form class="filters" data-asearch><label class="sr-only" for="aq">Find a player</label><input id="aq" name="q" type="search" value="${esc(term)}" placeholder="Find a player"><button class="btn btn-ink btn-s" type="submit">Find</button></form>
         <p class="fine">Temporary passwords appear once. Copy them and send them to the player privately.</p>
-        <ul class="ausers">${d.users.map(p => `<li class="card${p.banned ? " is-banned" : ""}" data-uid="${p.id}" data-uname="${esc(p.name)}">
-          <div class="au-id">${head(p, 36)}<div><a href="${WC.userHref(p)}"><b>${esc(p.name)}</b></a>${badges(p, true)}<small>${esc(p.role)} \u00b7 joined ${ago(p.created)} \u00b7 ${plural(p.posts, "post")}${p.banned ? ` \u00b7 <b class="war">banned</b>${p.banReason ? ": " + esc(p.banReason) : ""}` : ""}</small></div></div>
+        <ul class="ausers">${d.users.map(p => `<li class="card${p.banned ? " is-banned" : ""}" data-uid="${p.id}" data-uname="${esc(p.name)}" data-uign="${esc(p.ign || "")}">
+          <div class="au-id">${head(p, 36)}<div><a href="${WC.userHref(p)}"><b>${esc(p.name)}</b></a>${badges(p, true)}<small>${p.ign ? "in game " + esc(p.ign) : "no in-game name"} \u00b7 ${esc(p.role)} \u00b7 joined ${ago(p.created)} \u00b7 ${plural(p.posts, "post")}${p.banned ? ` \u00b7 <b class="war">banned</b>${p.banReason ? ": " + esc(p.banReason) : ""}` : ""}</small></div></div>
           <div class="au-acts">
-            <button type="button" class="link" data-uact="verify" data-v="${p.verified ? 0 : 1}">${p.verified ? "Unverify" : "Verify name"}</button>
+            ${p.ign ? `<button type="button" class="link" data-uact="verify" data-v="${p.verified ? 0 : 1}">${p.verified ? "Unverify" : "Verify in-game name"}</button>` : ""}
             ${p.id !== u.id ? (p.banned ? '<button type="button" class="link" data-uact="unban">Unban</button>' : '<button type="button" class="link danger" data-uact="ban">Ban</button>') : ""}
             ${admin && p.id !== u.id ? `<label class="fld-inline"><span class="sr-only">Role</span><select data-role>${["player", "mod", "admin"].map(r => `<option${r === p.role ? " selected" : ""}>${r}</option>`).join("")}</select></label>
-              <button type="button" class="link" data-uact="rename">Rename</button><button type="button" class="link" data-uact="reset">Reset password</button>` : ""}
+              <button type="button" class="link" data-uact="rename">Rename</button><button type="button" class="link" data-uact="ign">In-game name</button><button type="button" class="link" data-uact="reset">Reset password</button>` : ""}
           </div><div class="au-out" data-out></div></li>`).join("")}</ul>`;
     } else if (tab === "supporters") {
       const d = await api("/admin/supporters");
@@ -1536,7 +1874,10 @@
         out.innerHTML = `<form class="inline" data-banform><label class="fld"><span>Reason the player will see</span><input name="reason" maxlength="200" required placeholder="Reason..."></label><button class="btn btn-ink btn-s" type="submit">Ban ${esc(name)}</button></form>`;
         $("input", out).focus();
       } else if (act === "rename") {
-        out.innerHTML = `<form class="inline" data-renamef><label class="fld"><span>New name</span><input name="name" maxlength="17" required value="${esc(name)}"></label><button class="btn btn-ink btn-s" type="submit">Rename</button></form>`;
+        out.innerHTML = `<form class="inline" data-renamef><label class="fld"><span>New nickname</span><input name="name" maxlength="20" required value="${esc(name)}"></label><button class="btn btn-ink btn-s" type="submit">Rename</button></form>`;
+      } else if (act === "ign") {
+        out.innerHTML = `<form class="inline" data-ignf><label class="fld"><span>In-game name <small>empty clears it</small></span><input name="ign" maxlength="17" value="${esc(li.dataset.uign || "")}"></label><button class="btn btn-ink btn-s" type="submit">Save</button></form>`;
+        $("input", out).focus();
       } else if (act === "reset") twice(b, () => send({ action: "reset" }), "Reset? Click again");
       else if (act === "verify") send({ action: "verify", value: b.dataset.v === "1" });
       else send({ action: act });
@@ -1546,6 +1887,9 @@
     }));
     on("submit", "[data-renamef]", (e, f) => busy($("button", f), async () => {
       try { await api(`/admin/users/${f.closest("[data-uid]").dataset.uid}`, { body: { action: "rename", name: f.name.value } }); toast("Renamed"); route(); } catch (err) { toast(err.message); }
+    }));
+    on("submit", "[data-ignf]", (e, f) => busy($("button", f), async () => {
+      try { await api(`/admin/users/${f.closest("[data-uid]").dataset.uid}`, { body: { action: "ign", ign: f.ign.value.trim() } }); toast(f.ign.value.trim() ? "In-game name saved" : "In-game name cleared"); route(); } catch (err) { toast(err.message); }
     }));
     on("change", "[data-role]", async (e, s) => {
       try { await api(`/admin/users/${s.closest("[data-uid]").dataset.uid}`, { body: { action: "role", role: s.value } }); toast("Role changed to " + s.value); } catch (err) { toast(err.message); route(); }
@@ -1593,7 +1937,7 @@
       { g: "Community", t: "Server list", s: "Find a server and vote once a day", k: "servers server list vote voting", run: () => go("#/servers") },
       { g: "Community", t: "Add your server", s: "List it, verify it, reward voters", k: "add server list my server votifier", run: () => go("#/servers/new") },
       { g: "Community", t: "Search the board", s: "Threads and posts", k: "search forum find", run: () => go("#/search") },
-      { g: "Community", t: "Your settings", s: "Profile, face, password", k: "settings profile account password", run: () => go("#/settings") },
+      { g: "Community", t: "Your settings", s: "Profile, email, password, sign-in methods", k: "settings profile account password email recovery google discord facebook", run: () => go("#/settings") },
     ]));
   route();
 })();
