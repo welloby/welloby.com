@@ -22,8 +22,8 @@ window.WELLOBY = {
   "x": "https://x.com/WellobyLLC",
   "tiktok": "https://www.tiktok.com/@wellobyanarchy",
   "instagram": "https://www.instagram.com/welloby_official/",
-  "telegram": "https://t.me/welloby",
-  "youtube": ""
+  "telegram": "https://t.me/wellobyanarchy",
+  "youtube": "https://www.youtube.com/@wellobyanarchy"
  },
  "kevzy": {
   "name": "kevzy",
