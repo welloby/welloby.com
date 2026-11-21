@@ -82,9 +82,9 @@ window.KEVZY_KB = [
   { id: "players", q: ["is this server dead", "is the server dead", "is it dead", "how many players", "how many people play", "is it active", "player count", "dead server", "anyone online", "who is online", "is anyone playing"],
     k: ["players", "active", "online", "dead", "count"],
     a: ["press tab in game to see who's on. the discord also shows the online list."], act: [["Open Discord", "url:{discordUrl}"]] },
-  { id: "restarts", q: ["is it 24/7", "24/7", "restart", "restarts", "daily restart", "when does it restart", "uptime", "24/7", "is it always on"],
+  { id: "restarts", q: ["is it 24/7", "24/7", "restart", "restarts", "daily restart", "when does it restart", "what time does it restart", "restart time", "uptime", "24/7", "is it always on"],
     k: ["restart", "restarts", "uptime", "247"],
-    a: ["online 24/7, no daily restart. when an update needs one, a countdown shows in chat and on screen first."] },
+    a: ["online 24/7 apart from one short automatic restart a day at 09:40 utc. if an update needs another one, a countdown shows in chat and on screen first."] },
   { id: "ddos", q: ["ddos", "ddos protection", "is it ddos protected", "ddos attack"],
     k: ["ddos"],
     a: ["yes, ddos protected."] },
@@ -96,7 +96,7 @@ window.KEVZY_KB = [
     a: ["i don't have the seed, and it isn't on this site. explore the old way."], next: ["what's at spawn"] },
   { id: "time", q: ["server time", "what timezone", "what time is it on the server", "time zone"],
     k: ["timezone", "utc"],
-    a: ["there's no daily restart, so there's no clock to plan around. discord shows times in your own time zone."] },
+    a: ["the only fixed time is the short daily restart at 09:40 utc. discord shows times in your own time zone."] },
 
   // ---------- the world ----------
   { id: "reset", q: ["does the world ever get wiped", "is the map permanent", "permanent world", "does the map reset", "will it reset", "map reset", "wipe", "new map", "is there a wipe", "do you reset"],
