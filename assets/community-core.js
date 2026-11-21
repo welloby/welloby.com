@@ -318,11 +318,12 @@
           : `<a class="acct-in" href="${HUB}#/login">Sign in</a>`;
         continue;
       }
-      const alerts = (me.clanRequests || 0) + (me.reports || 0);
-      slot.innerHTML = `<details class="acct">
+      const alerts = (me.clanRequests || 0) + (me.reports || 0), unread = me.unreadChats || 0, many = n => (n > 99 ? "99+" : n);
+      slot.innerHTML = `<a class="acct-msg" href="${HUB}#/messages" title="Messages" aria-label="Messages${unread ? ", " + unread + " unread" : ""}"><svg class="i" aria-hidden="true"><use href="#i-chat"/></svg>${unread ? `<i class="acct-dot">${many(unread)}</i>` : ""}</a><details class="acct">
         <summary aria-label="Your account, ${esc(me.name)}${alerts ? ", " + alerts + " waiting" : ""}">${head(me, 26)}<span class="acct-name">${esc(me.name)}</span>${alerts ? `<i class="acct-dot">${alerts}</i>` : ""}</summary>
         <div class="acct-menu">
           <a href="${userHref(me)}">Your profile</a>
+          <a href="${HUB}#/messages">Messages${unread ? ` <i class="acct-dot">${many(unread)}</i>` : ""}</a>
           ${me.clan ? `<a href="${clanHref(me.clan)}">${esc(me.clan.name)}${me.clanRequests ? ` <i class="acct-dot">${me.clanRequests}</i>` : ""}</a>` : `<a href="${HUB}#/clans">Find a clan</a>`}
           <a href="${HUB}#/settings">Settings</a>
           ${me.role !== "player" ? `<a href="${HUB}#/admin">Staff desk${me.reports ? ` <i class="acct-dot">${me.reports}</i>` : ""}</a>` : ""}
@@ -340,6 +341,12 @@
     for (const d of $$("details.acct[open]")) { d.removeAttribute("open"); $("summary", d).focus(); }
   });
   subs.add(renderAccount);
+  /* the community page keeps the messages count fresh without fetching the whole account again */
+  function setUnread(n) {
+    if (!me || typeof n !== "number" || me.unreadChats === n) return;
+    me.unreadChats = n;
+    renderAccount();
+  }
 
   /* ---------- terms: every signed-in member accepts the current terms once per browser ---------- */
   const TERMS = { version: "2026-11-20", label: "20 November 2026", key: "welloby.terms", url: "terms.html" };
@@ -410,7 +417,7 @@
   for (const el of $$("[data-head-name]")) el.innerHTML = head({ name: el.dataset.headName }, 56);
 
   window.WC = {
-    API, HUB, ON_HUB, api, ApiError, ready, refreshMe, signOut, setSession,
+    API, HUB, ON_HUB, api, ApiError, ready, refreshMe, signOut, setSession, setUnread,
     me: () => me, health: () => health, onAuth: fn => { subs.add(fn); return () => subs.delete(fn); },
     esc, fmt, money, ago, when, plural, format, plain,
     head, headURL, banner, bannerURL, parseBanner, bannerSpec, randomBanner, COLORS, PATTERNS, PATTERN_NAMES, REACT,

@@ -734,7 +734,7 @@
     const officer = my && my.member && (my.role === "leader" || my.role === "officer"), leader = my && my.role === "leader";
     let act = "";
     if (!u) act = `<a class="btn btn-lava btn-l" href="#/login?next=${enc(location.hash)}">Sign in to join</a>`;
-    else if (my.member) act = `${officer ? `<a class="btn btn-lava btn-l" href="#/c/${enc(c.tag)}/edit">${icon("i-edit")}Edit clan</a>` : ""}<button type="button" class="btn btn-line btn-l" data-leave>${leader ? "Leave" : "Leave clan"}</button>${leader ? '<button type="button" class="btn btn-line btn-l btn-danger" data-disband>Disband</button>' : ""}`;
+    else if (my.member) act = `<a class="btn btn-lava btn-l" href="#/messages/clan">${icon("i-chat")}Clan chat</a>${officer ? `<a class="btn btn-line btn-l" href="#/c/${enc(c.tag)}/edit">${icon("i-edit")}Edit clan</a>` : ""}<button type="button" class="btn btn-line btn-l" data-leave>${leader ? "Leave" : "Leave clan"}</button>${leader ? '<button type="button" class="btn btn-line btn-l btn-danger" data-disband>Disband</button>' : ""}`;
     else if (my.inClan) act = `<p class="muted">You're in another clan.</p>`;
     else if (c.join === "open") act = `<button type="button" class="btn btn-lava btn-l" data-join>${icon("i-plus")}Join ${esc(c.name)}</button>`;
     else if (c.join === "request") act = my.requested ? `<p class="req-sent">${icon("i-check")}Request sent. The leader or an officer will answer.</p><button type="button" class="btn btn-line btn-s" data-cancelreq>Cancel request</button>`
@@ -1256,7 +1256,9 @@
             <p class="pf-badges">${badges(u) || ""}${u.role === "player" && !u.supporter && !u.verified ? '<span class="muted">Player</span>' : ""}</p>
             ${u.clan ? `<a class="pf-clan" href="#/c/${enc(u.clan.tag)}">${banner(u.clan.banner, "bnr-s")}<span><b>${esc(u.clan.name)}</b><small>${ROLE_NAMES[u.clan.role]} of [${esc(u.clan.tag)}]</small></span></a>` : '<p class="muted">No clan. A lone wolf, for now.</p>'}
             ${u.tags.length ? `<ul class="tags">${u.tags.map(t => `<li>${esc(TAG_NAMES[t] || t)}</li>`).join("")}</ul>` : ""}
-            ${mine ? `<p><a class="btn btn-line btn-s" href="#/settings">${icon("i-edit")}Edit your profile</a></p>` : ""}
+            ${mine ? `<p><a class="btn btn-line btn-s" href="#/settings">${icon("i-edit")}Edit your profile</a></p>`
+              : me() ? `<p><button type="button" class="btn btn-lava btn-s" data-dm="${esc(u.name)}">${icon("i-chat")}Message</button></p>`
+              : `<p><a class="btn btn-line btn-s" href="#/login?next=${enc(location.hash)}">${icon("i-chat")}Sign in to message</a></p>`}
           </div>
           <dl class="pf-stats">
             <div><dt>Posts</dt><dd data-count="${u.posts}">${fmt(u.posts)}</dd></div>
@@ -1274,7 +1276,312 @@
         <section class="panel"><header class="panel-h"><h2>Recent posts</h2></header>
           ${d.posts.length ? `<ul class="mini-list">${d.posts.map(p => `<li><a href="#/t/${p.thread.id}?p=${p.id}">${esc(plain(p.body, 140))}</a><small>in ${esc(p.thread.title)} \u00b7 ${ago(p.created)}</small></li>`).join("")}</ul>` : '<p class="muted">No posts yet.</p>'}</section>
       </div>`, u.name, () => countUp(app));
+    on("click", "[data-dm]", (e, b) => busy(b, () => openChatWith(b.dataset.dm)));
   });
+
+  /* ======================================================== MESSAGES
+     The inbox, one chat at a time, and the count in the top bar. There are no sockets, so an open
+     chat asks for news every few seconds while it's busy and less often as it goes quiet. */
+  const setUnread = n => { if (WC.setUnread) WC.setUnread(n); };
+  const checkUnread = () => { if (me()) api("/chats/unread").then(r => setUnread(r.unread)).catch(() => { /* next time */ }); };
+  setInterval(() => { if (!document.hidden) checkUnread(); }, 45000);
+  let chatKick = null;   // the open chat's "look now", for when the tab comes back into view
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && chatKick) chatKick(); });
+
+  async function openChatWith(name) {
+    try { const r = await api("/chats", { body: { to: name } }); go("#/messages/" + r.id); }
+    catch (err) { toast(err.status === 401 ? "Sign in to send messages." : err.message); }
+  }
+  const many = n => (n > 99 ? "99+" : String(n));
+  function chatPic(ch, size) {
+    if (ch.kind === "dm") return head(ch.with, size);
+    if (ch.kind === "clan" && ch.clan) return banner(ch.clan.banner, "bnr-s", ch.clan.name + " banner");
+    return `<span class="grp-pic" style="--s:${size}px">${icon("i-users")}</span>`;
+  }
+  function chatRow(ch) {
+    const last = ch.last;
+    const said = last ? (last.mine ? "You: " : ch.kind !== "dm" ? last.by + ": " : "") + (last.text ? plain(last.text, 90) : "Message deleted") : "No messages yet";
+    const kind = ch.kind === "group" ? '<span class="chip">Group</span>' : ch.kind === "clan" ? '<span class="chip">Clan</span>' : "";
+    return `<li><a class="chatrow${ch.unread ? " is-unread" : ""}" href="#/messages/${ch.id}">
+      <span class="chatrow-pic">${chatPic(ch, 44)}</span>
+      <span class="chatrow-main"><span class="chatrow-name"><b>${esc(ch.title)}</b>${kind}${ch.muted ? '<span class="chip">Muted</span>' : ""}</span><small>${esc(said)}</small></span>
+      <span class="chatrow-side">${ch.at ? `<time>${esc(ago(ch.at))}</time>` : ""}${ch.unread ? `<i class="acct-dot" aria-label="${ch.unread} unread">${many(ch.unread)}</i>` : ""}</span></a></li>`;
+  }
+  const noChats = '<li class="chats-none muted">No chats yet. Message a player above, or with the Message button on their profile.</li>';
+
+  page(/^\/messages\/?$/, async (m, q, stale) => {
+    if (!me()) { show(`<section class="pagehead"><div class="wrap"><h1>Messages</h1></div></section><div class="wrap narrow">${needSignIn("to message players")}</div>`, "Messages"); return; }
+    const d = await api("/chats");
+    if (stale()) return;
+    setUnread(d.unread);
+    show(`
+      <section class="pagehead"><div class="wrap"><p class="kicker">Private</p><h1>Messages</h1>
+        <p class="pagehead-lede">Chats with players, your groups and your clan. Only the people in a chat can read it.</p></div></section>
+      <div class="wrap msgs">
+        <div class="msgs-start">
+          <form class="card form msg-new" data-newdm><h2>Message a player</h2>
+            <div class="msg-new-row"><label class="sr-only" for="dmto">Nickname</label><input id="dmto" name="to" required maxlength="20" placeholder="Their nickname or in-game name" spellcheck="false" autocapitalize="off" autocomplete="off">
+              <button class="btn btn-lava" type="submit">Start chat</button></div>${errBox()}</form>
+          <details class="card form msg-new"${q.get("group") ? " open" : ""}><summary><h2>New group</h2><small>up to 50 people</small></summary>
+            <form data-newgroup><label class="fld"><span>Group name</span><input name="title" required maxlength="40" placeholder="Base crew"></label>
+              <label class="fld"><span>Players <small>nicknames, with commas between</small></span><input name="members" required placeholder="Steve, Alex" spellcheck="false" autocapitalize="off" autocomplete="off"></label>
+              ${errBox()}<p class="form-acts"><button class="btn btn-ink" type="submit">Make the group</button></p></form></details>
+        </div>
+        <ul class="chats" data-chats>${d.chats.map(chatRow).join("") || noChats}</ul>
+      </div>`, "Messages");
+    on("submit", "[data-newdm]", (e, f) => busy($("button[type=submit]", f), async () => {
+      formErr(f, "");
+      try { const r = await api("/chats", { body: { to: f.to.value.trim() } }); go("#/messages/" + r.id); } catch (err) { formErr(f, err.message); }
+    }));
+    on("submit", "[data-newgroup]", (e, f) => busy($("button[type=submit]", f), async () => {
+      formErr(f, "");
+      const members = f.members.value.split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
+      try { const r = await api("/chats", { body: { title: f.title.value, members } }); go("#/messages/" + r.id); } catch (err) { formErr(f, err.message); }
+    }));
+    every(20000, async () => {
+      try {
+        const r = await api("/chats");
+        const ul = $("[data-chats]", app);
+        if (stale() || !ul) return;
+        setUnread(r.unread);
+        ul.innerHTML = r.chats.map(chatRow).join("") || noChats;
+      } catch (e) { /* next time */ }
+    });
+  });
+
+  page(/^\/messages\/(\d+|clan)$/, async (m, q, stale) => {
+    if (!me()) { show(`<section class="pagehead"><div class="wrap"><h1>Messages</h1></div></section><div class="wrap narrow">${needSignIn("to read your messages")}</div>`, "Messages"); return; }
+    if (m[1] === "clan") {
+      let r = null;
+      try { r = await api("/chats/clan"); } catch (err) { if (err.status !== 404) throw err; }
+      if (stale()) return;
+      if (r) location.replace("#/messages/" + r.id);
+      else show(authCard("Clan chat", "You're not in a clan", "<p>Join a clan, or found your own, and its chat shows up here.</p>", [["#/clans", "Find a clan"], ["#/messages", "Messages"]]), "Clan chat");
+      return;
+    }
+    const d = await api("/chats/" + m[1]);
+    if (stale()) return;
+    renderChat(d, stale);
+  });
+
+  function renderChat(d, stale) {
+    const ch = d.chat, u = me(), msgs = d.messages.slice();
+    let lastId = msgs.length ? msgs[msgs.length - 1].id : 0, since = d.now, seen = ch.seen || 0, quiet = Date.now(), timer = 0;
+    const dayOf = t => new Date(t).toDateString();
+    const dayName = t => {
+      const x = new Date(t), now = new Date(), y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      if (x.toDateString() === now.toDateString()) return "Today";
+      if (x.toDateString() === y.toDateString()) return "Yesterday";
+      return x.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", ...(x.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }) });
+    };
+    const clock = t => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    function msgHTML(msg, prev) {
+      const mine = msg.user.id === u.id;
+      const cont = !!prev && prev.user.id === msg.user.id && msg.at - prev.at < 5 * 60e3 && dayOf(prev.at) === dayOf(msg.at);
+      const day = !prev || dayOf(prev.at) !== dayOf(msg.at) ? `<li class="msg-day"><span>${esc(dayName(msg.at))}</span></li>` : "";
+      const text = msg.deleted ? '<p class="msg-gone">Message deleted</p>'
+        : msg.hidden ? `<p class="msg-gone">From a player you blocked. <button type="button" class="link" data-reveal>Show it</button></p><div class="msg-hid" hidden>${format(msg.body)}</div>`
+        : format(msg.body);
+      const acts = msg.deleted ? "" : mine ? '<button type="button" class="link" data-mdel>Delete</button>' : '<button type="button" class="link" data-mrep>Report</button>';
+      const face = msg.user.deleted ? head(msg.user, 32) : `<a href="${WC.userHref(msg.user)}" tabindex="-1" aria-hidden="true">${head(msg.user, 32)}</a>`;
+      return `${day}<li class="msg${mine ? " mine" : ""}${cont ? " cont" : ""}" id="m${msg.id}" data-mid="${msg.id}">
+        ${mine ? "" : `<span class="msg-head">${cont ? "" : face}</span>`}
+        <div class="msg-b">${!mine && !cont && ch.kind !== "dm" ? `<p class="msg-who">${msg.user.deleted ? "Deleted player" : `<a href="${WC.userHref(msg.user)}">${esc(msg.user.name)}</a>`}${ctag(msg.user.clan)}</p>` : ""}
+          <div class="msg-text">${text}</div>
+          <p class="msg-meta"><time datetime="${new Date(msg.at).toISOString()}" title="${esc(when(msg.at))}">${clock(msg.at)}</time>${acts}</p></div></li>`;
+    }
+    const listHTML = list => list.map((x, i) => msgHTML(x, list[i - 1])).join("");
+    const sub = ch.kind === "dm" ? (ch.with.deleted ? "Deleted their account" : `<a href="${WC.userHref(ch.with)}">View profile</a>${ch.with.clan ? ctag(ch.with.clan) : ""}`)
+      : ch.kind === "clan" ? (ch.clan ? `<a href="#/c/${enc(ch.clan.tag)}">[${esc(ch.clan.tag)}]</a> \u00b7 ${plural(ch.count, "member")}` : "")
+      : `${plural(ch.count, "person", "people")}${ch.owner ? " \u00b7 you run it" : ""}`;
+    const acts = [`<button type="button" class="btn btn-line btn-s" data-mute aria-pressed="${ch.muted}">${ch.muted ? "Unmute" : "Mute"}</button>`];
+    if (ch.kind === "group") acts.unshift(`<button type="button" class="btn btn-line btn-s" data-people aria-expanded="false">${icon("i-users")}People</button>`), acts.push('<button type="button" class="btn btn-line btn-s btn-danger" data-leavechat>Leave</button>');
+    if (ch.kind === "dm" && !ch.with.deleted) acts.push(`<button type="button" class="btn btn-line btn-s${ch.blocked ? "" : " btn-danger"}" data-block>${ch.blocked ? "Unblock" : "Block"}</button>`, '<button type="button" class="btn btn-line btn-s" data-hidechat>Hide chat</button>');
+    const closed = ch.kind !== "dm" ? "" : ch.with.deleted ? "This player deleted their account, so the chat is closed."
+      : ch.blocked ? `You blocked ${esc(ch.with.name)}. Unblock them to write again.` : ch.blockedBy ? `You can't message ${esc(ch.with.name)}.` : "";
+    const people = ch.kind !== "group" ? "" : `<section class="card chat-people" data-peoplepanel hidden><h2>People <small>${ch.count}</small></h2>
+      <ul class="chat-members">${ch.members.map(p => `<li>${who(p, 28, { badges: false })}${p.owner ? '<span class="chip">Runs it</span>' : ""}${ch.owner && p.id !== u.id ? `<button type="button" class="link danger" data-kick="${esc(p.name)}">Remove</button>` : ""}</li>`).join("")}</ul>
+      ${ch.owner ? `<form class="msg-new-row" data-addmember><label class="sr-only" for="addm">Add a player</label><input id="addm" name="name" required maxlength="20" placeholder="Add a player by nickname" spellcheck="false" autocapitalize="off" autocomplete="off"><button class="btn btn-ink btn-s" type="submit">Add</button>${errBox()}</form>
+        <form class="msg-new-row" data-rename><label class="sr-only" for="gname">Group name</label><input id="gname" name="title" required maxlength="40" value="${esc(ch.title)}"><button class="btn btn-line btn-s" type="submit">Rename</button>${errBox()}</form>` : ""}</section>`;
+    show(`
+      <div class="chatpage">
+        <header class="chat-top"><div class="wrap chat-top-in">
+          <a class="chat-back" href="#/messages" title="All messages" aria-label="Back to all messages">&larr;</a>
+          <span class="chat-pic">${chatPic(ch, 40)}</span>
+          <div class="chat-id"><h1>${esc(ch.title)}</h1><small>${sub}</small></div>
+          <div class="chat-acts">${acts.join("")}</div>
+        </div></header>
+        <div class="chat-scroll" data-scroll><div class="wrap chat-log">
+          ${people}
+          ${d.more ? '<p class="chat-older"><button type="button" class="btn btn-line btn-s" data-older>Show older messages</button></p>' : ""}
+          <ol class="msglist" data-list>${listHTML(msgs)}</ol>
+          <p class="chat-empty muted" data-emptychat${msgs.length ? " hidden" : ""}>No messages yet. Say hello.</p>
+          <p class="chat-newpill" data-newpill hidden><button type="button" class="btn btn-lava btn-s" data-jump>New messages</button></p>
+        </div></div>
+        ${closed ? `<div class="chat-send chat-closed"><div class="wrap"><p class="muted">${closed}</p></div></div>`
+          : `<form class="chat-send" data-send><div class="wrap chat-send-in"><label class="sr-only" for="msgbody">Your message</label>
+            <textarea id="msgbody" name="body" rows="1" maxlength="2000" required placeholder="Message ${esc(ch.kind === "clan" ? "your clan" : ch.title)}" data-composer></textarea>
+            <button class="btn btn-lava" type="submit" aria-label="Send">${icon("i-send")}<span>Send</span></button></div></form>`}
+      </div>`, ch.title);
+    const box = $("[data-scroll]", app), list = $("[data-list]", app);
+    const nearBottom = () => box.scrollHeight - box.scrollTop - box.clientHeight < 140;
+    const toBottom = () => { box.scrollTop = box.scrollHeight; $("[data-newpill]", app).hidden = true; };
+    function paintSeen() {
+      for (const s of $$(".msg-seen", list)) s.remove();
+      if (ch.kind !== "dm") return;
+      const mine = msgs.filter(x => x.user.id === u.id && !x.deleted).pop();
+      const meta = mine && seen >= mine.id && $(`#m${mine.id} .msg-meta`, list);
+      if (meta) meta.insertAdjacentHTML("beforeend", '<span class="msg-seen">Seen</span>');
+    }
+    function add(news) {
+      const fresh = news.filter(x => !msgs.some(y => y.id === x.id));
+      if (!fresh.length) return false;
+      list.insertAdjacentHTML("beforeend", fresh.map((x, i) => msgHTML(x, i ? fresh[i - 1] : msgs[msgs.length - 1])).join(""));
+      msgs.push(...fresh);
+      lastId = Math.max(lastId, ...fresh.map(x => x.id));
+      $("[data-emptychat]", app).hidden = true;
+      paintSeen();
+      return true;
+    }
+    function gone(id) {
+      const x = msgs.find(y => y.id === id);
+      if (x) { x.deleted = true; x.body = ""; }
+      const li = $("#m" + id, list);
+      if (!li) return;
+      $(".msg-text", li).innerHTML = '<p class="msg-gone">Message deleted</p>';
+      for (const b of $$(".msg-meta .link", li)) b.remove();
+      paintSeen();
+    }
+    const composer = $("[data-composer]", app), touch = matchMedia("(pointer: coarse)").matches;
+    // drawing the page scrolled it to the top and focused the title; the chat starts at its newest message,
+    // and on a computer the cursor waits in the message box
+    requestAnimationFrame(() => { toBottom(); paintSeen(); if (composer && !touch) composer.focus({ preventScroll: true }); });
+    checkUnread();
+
+    function plan() {
+      clearTimeout(timer);
+      const idle = Date.now() - quiet;
+      timer = setTimeout(poll, idle < 2 * 60e3 ? 4000 : idle < 10 * 60e3 ? 10000 : 30000);
+      timers.push(timer);
+    }
+    async function poll() {
+      if (stale()) { chatKick = null; return; }
+      if (document.hidden) { plan(); return; }
+      try {
+        const r = await api(`/chats/${ch.id}?after=${lastId}&since=${since}`);
+        if (stale()) return;
+        since = r.now;
+        const near = nearBottom();
+        if (add(r.messages)) {
+          quiet = Date.now();
+          if (near) toBottom(); else $("[data-newpill]", app).hidden = false;
+          checkUnread();
+        }
+        for (const id of r.gone || []) gone(id);
+        if (typeof r.seen === "number" && r.seen !== seen) { seen = r.seen; paintSeen(); }
+      } catch (err) {
+        if (stale()) return;
+        if (err.status === 404) {   // taken out of the group, or out of the clan
+          const f = $("[data-send]", app);
+          if (f) f.outerHTML = '<div class="chat-send chat-closed"><div class="wrap"><p class="muted">You\'re not in this chat any more.</p></div></div>';
+          chatKick = null;
+          return;
+        }
+      }
+      plan();
+    }
+    chatKick = () => { if (stale()) { chatKick = null; return; } clearTimeout(timer); poll(); };
+    plan();
+
+    const grow = ta => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 160) + "px"; };
+    on("input", "[data-composer]", (e, ta) => grow(ta));
+    // Enter sends and Shift+Enter starts a new line; on phones Enter stays a new line and the button sends
+    on("keydown", "[data-composer]", (e, ta) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !touch) { e.preventDefault(); ta.form.requestSubmit(); }
+    });
+    on("submit", "[data-send]", (e, f) => {
+      const text = f.body.value.trim();
+      if (!text) return;
+      busy($("button[type=submit]", f), async () => {
+        try {
+          const r = await api(`/chats/${ch.id}/messages`, { body: { body: text } });
+          f.body.value = ""; grow(f.body);
+          add([r.message]);
+          toBottom();
+          quiet = Date.now();
+          plan();
+        } catch (err) { toast(err.message); }
+        f.body.focus();
+      });
+    });
+    on("click", "[data-jump]", () => toBottom());
+    on("click", "[data-older]", (e, b) => busy(b, async () => {
+      try {
+        const r = await api(`/chats/${ch.id}?before=${msgs[0].id}`);
+        const keep = box.scrollHeight - box.scrollTop;
+        msgs.unshift(...r.messages);
+        list.innerHTML = listHTML(msgs);
+        box.scrollTop = box.scrollHeight - keep;
+        if (!r.more) b.closest(".chat-older").remove();
+        paintSeen();
+      } catch (err) { toast(err.message); }
+    }));
+    on("click", "[data-reveal]", (e, b) => { const t = b.closest(".msg-text"); $(".msg-hid", t).hidden = false; b.parentElement.remove(); });
+    on("click", "[data-mdel]", (e, b) => twice(b, () => busy(b, async () => {
+      const id = Number(b.closest("[data-mid]").dataset.mid);
+      try { await api(`/chats/${ch.id}/messages/${id}`, { method: "DELETE" }); gone(id); } catch (err) { toast(err.message); }
+    }), "Delete it?"));
+    on("click", "[data-mrep]", (e, b) => {
+      const li = b.closest("[data-mid]");
+      if ($("[data-mrepform]", li)) return;
+      $(".msg-b", li).insertAdjacentHTML("beforeend", `<form class="report" data-mrepform><label class="fld"><span>What's wrong with this message?</span>
+        <input name="reason" maxlength="300" minlength="3" required placeholder="What happened..."></label><button class="btn btn-ink btn-s" type="submit">Send to staff</button><button class="btn btn-line btn-s" type="button" data-cancelreport>Cancel</button>${errBox()}</form>`);
+      $("[data-mrepform] input", li).focus();
+    });
+    on("click", "[data-cancelreport]", (e, b) => b.closest("form").remove());
+    on("submit", "[data-mrepform]", (e, f) => busy($("button[type=submit]", f), async () => {
+      try { await api(`/chats/${ch.id}/messages/${f.closest("[data-mid]").dataset.mid}/report`, { body: { reason: f.reason.value } }); f.outerHTML = '<p class="report-done">Thanks. The staff will look at it.</p>'; }
+      catch (err) { formErr(f, err.message); }
+    }));
+    on("click", "[data-mute]", (e, b) => busy(b, async () => {
+      try {
+        await api(`/chats/${ch.id}`, { method: "PATCH", body: { muted: !ch.muted } });
+        ch.muted = !ch.muted;
+        b.textContent = ch.muted ? "Unmute" : "Mute"; b.setAttribute("aria-pressed", String(ch.muted));
+        toast(ch.muted ? "Muted. It won't add to your unread count." : "Unmuted");
+        checkUnread();
+      } catch (err) { toast(err.message); }
+    }));
+    on("click", "[data-people]", (e, b) => { const p = $("[data-peoplepanel]", app); p.hidden = !p.hidden; b.setAttribute("aria-expanded", String(!p.hidden)); if (!p.hidden) box.scrollTop = 0; });
+    on("click", "[data-leavechat]", (e, b) => twice(b, () => busy(b, async () => {
+      try { await api(`/chats/${ch.id}/members/me`, { method: "DELETE" }); toast("You left " + ch.title); go("#/messages"); } catch (err) { toast(err.message); }
+    }), "Leave the group?"));
+    on("click", "[data-kick]", (e, b) => twice(b, () => busy(b, async () => {
+      try { await api(`/chats/${ch.id}/members/${enc(b.dataset.kick)}`, { method: "DELETE" }); toast(b.dataset.kick + " is out of the group"); route(); } catch (err) { toast(err.message); }
+    }), "Remove?"));
+    on("submit", "[data-addmember]", (e, f) => busy($("button[type=submit]", f), async () => {
+      formErr(f, "");
+      try { const r = await api(`/chats/${ch.id}/members`, { body: { name: f.name.value.trim() } }); toast(r.user.name + " is in the group"); route(); } catch (err) { formErr(f, err.message); }
+    }));
+    on("submit", "[data-rename]", (e, f) => busy($("button[type=submit]", f), async () => {
+      formErr(f, "");
+      try { await api(`/chats/${ch.id}`, { method: "PATCH", body: { title: f.title.value } }); toast("Renamed"); route(); } catch (err) { formErr(f, err.message); }
+    }));
+    on("click", "[data-block]", (e, b) => {
+      const act = () => busy(b, async () => {
+        try {
+          if (ch.blocked) await api("/blocks/" + enc(ch.with.name), { method: "DELETE" });
+          else await api("/blocks", { body: { name: ch.with.name } });
+          toast(ch.blocked ? ch.with.name + " is unblocked" : ch.with.name + " is blocked. They can't message you.");
+          route();
+        } catch (err) { toast(err.message); }
+      });
+      if (ch.blocked) act(); else twice(b, act, "Block them?");
+    });
+    on("click", "[data-hidechat]", (e, b) => busy(b, async () => {
+      try { await api(`/chats/${ch.id}`, { method: "PATCH", body: { hidden: true } }); toast("Hidden. It comes back if they write again."); go("#/messages"); } catch (err) { toast(err.message); }
+    }));
+  }
 
   /* ======================================================== SUPPORTERS */
   page(/^\/supporters\/?$/, async (m, q, stale) => {
@@ -1756,14 +2063,38 @@
             ${newPwFields("New password <small>at least 8 characters</small>", "Type it again", true, ["next", "next2"])}
             ${errBox()}<p class="form-acts"><button class="btn btn-ink" type="submit">${a.hasPassword ? "Change password" : "Set password"}</button></p>
             ${a.hasPassword ? '<p class="fine">Changing it signs you out everywhere else.</p>' : ""}</form>
+          <form class="card form" data-dmprefs id="messages"><h2>Messages</h2>
+            <fieldset class="fld"><legend>Who can start a chat with you</legend>
+              ${[["all", "Everyone"], ["clan", "Only my clan"], ["none", "Nobody"]].map(([v, l]) => `<label class="check"><input type="radio" name="dmFrom" value="${v}"${(a.dmFrom || "all") === v ? " checked" : ""}><span>${l}</span></label>`).join("")}</fieldset>
+            <p class="fine">Chats you already have keep working, and the staff can always reach you. To stop one player, block them from your chat with them.</p>
+            ${errBox()}<p class="form-acts"><button class="btn btn-ink" type="submit">Save</button></p>
+            <h3 class="mini">Blocked players</h3><div data-blocks><p class="muted">Loading...</p></div></form>
           <div class="card form"><h2>Sessions</h2><p class="fine">Signed in on a computer that isn't yours?</p><p class="form-acts"><button type="button" class="btn btn-line" data-everywhere>Sign out everywhere</button></p></div>
           <form class="card form danger-zone" data-delete><h2>Delete account</h2>
-            <p class="fine">Your name, email, profile, sign-ins and clan role go. Your posts stay up as "Deleted player" so threads still make sense. If you lead a clan, the next officer takes over.</p>
+            <p class="fine">Your name, email, profile, sign-ins and clan role go, and you leave your group chats. Your posts and messages stay up as "Deleted player" so threads and chats still make sense. If you lead a clan, the next officer takes over.</p>
             ${a.hasPassword ? '<label class="fld"><span>Type your password to confirm</span><input name="password" type="password" autocomplete="current-password" required></label>'
               : `<label class="fld"><span>Type your nickname, ${esc(u.name)}, to confirm</span><input name="confirm" autocomplete="off" required spellcheck="false" autocapitalize="off"></label>`}
             ${errBox()}<p class="form-acts"><button class="btn btn-line btn-danger" type="submit">Delete my account</button></p></form>
         </div>
       </div>`, "Settings");
+    const paintBlocks = list => {
+      const box = $("[data-blocks]", app);
+      if (box) box.innerHTML = list.length ? `<ul class="chat-members">${list.map(p => `<li>${who(p, 24, { badges: false })}<button type="button" class="link" data-unblock="${esc(p.name)}">Unblock</button></li>`).join("")}</ul>`
+        : '<p class="muted">Nobody. Block someone from your chat with them.</p>';
+    };
+    api("/blocks").then(r => { if (!stale()) paintBlocks(r.blocked); }).catch(() => paintBlocks([]));
+    on("submit", "[data-dmprefs]", (e, f) => busy($("button[type=submit]", f), async () => {
+      formErr(f, "");
+      try {
+        const r = await api("/me", { method: "PATCH", body: { dmFrom: (f.querySelector("input[name=dmFrom]:checked") || {}).value || "all" } });
+        WC.setSession(store.get("welloby.session"), r.user);
+        toast("Saved");
+      } catch (err) { formErr(f, err.message); }
+    }));
+    on("click", "[data-unblock]", (e, b) => busy(b, async () => {
+      try { await api("/blocks/" + enc(b.dataset.unblock), { method: "DELETE" }); toast(b.dataset.unblock + " is unblocked"); paintBlocks((await api("/blocks")).blocked); }
+      catch (err) { toast(err.message); }
+    }));
     const paintFace = () => { $("[data-face]", app).innerHTML = head({ name: u.name, avatar }, 112, "hd-xl"); };
     const redraw = r => { if (r && r.user) WC.setSession(store.get("welloby.session"), r.user); route(); };
     pwHandlers();
@@ -1840,12 +2171,19 @@
     const dots = { reports: (u.reports || 0) - (u.serverReports || 0), servers: u.serverReports || 0 };
     let body = "";
     if (tab === "reports") {
-      const d = await api("/admin/reports");
+      const [d, dm] = await Promise.all([api("/admin/reports"), api("/admin/chat-reports").catch(() => ({ reports: [] }))]);
       if (stale()) return;
-      body = d.reports.length ? `<ul class="reports">${d.reports.map(r => `<li class="card" data-rep="${r.id}">
+      const posts = d.reports.length ? `<h2 class="staff-h">Reported posts</h2><ul class="reports">${d.reports.map(r => `<li class="card" data-rep="${r.id}">
         <p class="rep-top"><b>${esc(r.reason)}</b><small>reported by ${esc(r.by || "someone")} \u00b7 ${ago(r.created)}</small></p>
         <div class="rep-post">${head(r.author, 32)}<div><p><a href="${WC.userHref(r.author)}">${esc(r.author.name)}</a> in <a href="#/t/${r.post.thread}?p=${r.post.id}">${esc(r.post.title)}</a></p><div class="post-body">${format(r.post.body)}</div></div></div>
-        <p class="form-acts"><button type="button" class="btn btn-line btn-s btn-danger" data-repact="delete">Remove the post</button><button type="button" class="btn btn-line btn-s" data-repact="dismiss">It's fine</button></p></li>`).join("")}</ul>` : empty("No open reports. Quiet day.");
+        <p class="form-acts"><button type="button" class="btn btn-line btn-s btn-danger" data-repact="delete">Remove the post</button><button type="button" class="btn btn-line btn-s" data-repact="dismiss">It's fine</button></p></li>`).join("")}</ul>` : "";
+      const where = { dm: "a private chat", group: "a group chat", clan: "a clan chat" };
+      const chats = dm.reports.length ? `<h2 class="staff-h">Reported messages</h2><p class="fine">You see the reported message as it was when it was reported, and nothing else from the chat.</p>
+        <ul class="reports">${dm.reports.map(r => `<li class="card" data-crep="${r.id}">
+        <p class="rep-top"><b>${esc(r.reason)}</b><small>reported by ${esc(r.by || "someone")} \u00b7 ${ago(r.created)}</small></p>
+        <div class="rep-post">${head(r.author || { deleted: true }, 32)}<div><p>${r.author ? `<a href="${WC.userHref(r.author)}">${esc(r.author.name)}</a>` : "Deleted player"} in ${where[r.message.chat] || "a chat that's gone now"}${r.message.deleted ? " \u00b7 already deleted" : ""}</p><div class="post-body">${format(r.message.body)}</div></div></div>
+        <p class="form-acts">${r.message.deleted ? "" : '<button type="button" class="btn btn-line btn-s btn-danger" data-crepact="delete">Delete the message</button>'}<button type="button" class="btn btn-line btn-s" data-crepact="dismiss">${r.message.deleted ? "Close the report" : "It's fine"}</button></p></li>`).join("")}</ul>` : "";
+      body = posts + chats || empty("No open reports. Quiet day.");
     } else if (tab === "players") {
       const term = q.get("q") || "";
       const d = await api("/admin/users?q=" + enc(term));
@@ -1908,6 +2246,11 @@
     on("click", "[data-repact]", (e, b) => busy(b, async () => {
       const id = b.closest("[data-rep]").dataset.rep;
       try { await api(`/admin/reports/${id}`, { body: { action: b.dataset.repact } }); toast(b.dataset.repact === "delete" ? "Post removed" : "Report closed"); await WC.refreshMe(); route(); }
+      catch (err) { toast(err.message); }
+    }));
+    on("click", "[data-crepact]", (e, b) => busy(b, async () => {
+      const id = b.closest("[data-crep]").dataset.crep;
+      try { await api(`/admin/chat-reports/${id}`, { body: { action: b.dataset.crepact } }); toast(b.dataset.crepact === "delete" ? "Message deleted" : "Report closed"); await WC.refreshMe(); route(); }
       catch (err) { toast(err.message); }
     }));
     on("submit", "[data-asearch]", (e, f) => go("#/admin/players" + (f.q.value.trim() ? "?q=" + enc(f.q.value.trim()) : "")));
