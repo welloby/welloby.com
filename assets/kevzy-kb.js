@@ -240,8 +240,8 @@ window.KEVZY_KB = [
   // ---------- rules & hacks ----------
   { id: "rules", q: ["what is not allowed", "what is allowed", "whats allowed", "what cant i do", "what are the rules", "rules", "is there rules", "what is banned", "can i get banned", "what gets you banned", "server rules", "no rules"],
     k: ["rules", "banned", "ban", "bannable"],
-    a: ["it's anarchy: hacks, griefing, pvp, dupes and stealing are all part of the game. if you're unsure about something, ask in the discord."],
-    act: [["Read the rules", "go:#rules"]], next: ["are hacked clients allowed", "are dupes allowed"] },
+    a: ["it's anarchy: hacks, griefing, pvp, dupes and stealing are all part of the game. staff can still ban anyone, for any reason, and playing means you accept the terms. if you're unsure about something, ask in the discord."],
+    act: [["Read the rules", "go:#rules"], ["Terms", "url:terms.html"]], next: ["are hacked clients allowed", "are dupes allowed"] },
   { id: "hacks", q: ["are hacked clients allowed", "hacks", "can i hack", "cheats", "cheating allowed", "hacked client", "is hacking allowed", "can i use a hacked client"],
     k: ["hacks", "hack", "hacked", "cheat", "cheats", "cheating", "client"],
     a: ["yes, hacked clients are allowed. the anticheat stops crashers, lag machines and exploits, and holds movement hacks near natural speeds."],

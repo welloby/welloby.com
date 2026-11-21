@@ -512,6 +512,20 @@ h1 .tr-flag .i{width:.5em;height:.5em;margin-right:.15em}
 .authcard .fld-note.good{color:#4d7a1c}
 .authcard .fld-note.bad{color:var(--ember)}
 .ts{min-height:65px}
+/* terms: the tick box on sign-up and the accept prompt for members who are already signed in */
+.fld-check{display:flex;align-items:flex-start;gap:10px;font-size:14.5px;line-height:1.45;font-weight:500;cursor:pointer}
+.fld-check input{flex:none;width:20px;height:20px;margin:1px 0 0;accent-color:var(--lava)}
+.fld-check a{font-weight:700;text-underline-offset:3px}
+.authcard .fld-check a{color:var(--ember)}
+.terms-gate{--n:14px;width:min(520px,calc(100% - 28px));max-width:none;padding:clamp(22px,3vw,34px);border:0;background:var(--bone);color:var(--ink);box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.terms-gate::backdrop{background:rgba(10,9,8,.72);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.terms-gate .kicker{color:var(--ember)}
+.terms-gate h2{margin-bottom:14px;font:800 clamp(30px,4vw,44px)/.95 var(--display);letter-spacing:-.005em;text-transform:uppercase}
+.terms-gate p{font-size:16px;line-height:1.55}
+.terms-gate p+p{margin-top:10px}
+.terms-gate a{font-weight:700;color:var(--ember);text-underline-offset:3px}
+.terms-gate-acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.terms-gate .btn-line{color:var(--ink);border-color:var(--ink)}
 .welcome .welcomecard{display:grid;justify-items:center;gap:14px;width:min(900px,100%);text-align:center}
 .welcome h1{font-size:clamp(46px,7vw,100px)}
 .welcome .mast-lede{margin-top:0}

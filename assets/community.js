@@ -1321,6 +1321,7 @@
               <span class="pwmeter" aria-hidden="true"><i data-pwbar></i></span><small class="fld-note" data-pwnote aria-live="polite"></small></label>
             <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
             ${site ? '<div class="ts" data-ts></div>' : ""}
+            <label class="fld-check"><input type="checkbox" name="terms" required><span>I agree to the <a href="terms.html" target="_blank" rel="noopener">Welloby terms</a>, including that staff can ban anyone for any reason and that Welloby isn't responsible for what I lose.</span></label>
             ${errBox()}
             <button class="btn btn-lava btn-l" type="submit">Claim it</button>
             <p class="authalt">Already have an account? <a href="#/login${q.get("next") ? "?next=" + enc(q.get("next")) : ""}">Sign in</a></p>
@@ -1351,8 +1352,10 @@
     });
     on("submit", "[data-register]", (e, f) => busy($("button[type=submit]", f), async () => {
       formErr(f, "");
+      if (!f.terms.checked) { formErr(f, "Tick the box to accept the terms first."); return; }
       try {
         const r = await api("/auth/register", { body: { name: f.name.value.trim(), password: f.password.value, website: f.website.value, turnstile: tsToken } });
+        WC.acceptTerms();
         WC.setSession(r.token, r.user);
         go("#/welcome" + (nextHash(q) ? "?next=" + enc(nextHash(q)) : ""));
       } catch (err) { formErr(f, err.message); if (window.turnstile && site) window.turnstile.reset(); }

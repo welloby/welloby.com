@@ -341,6 +341,41 @@
   });
   subs.add(renderAccount);
 
+  /* ---------- terms: every signed-in member accepts the current terms once per browser ---------- */
+  const TERMS = { version: "2026-11-20", label: "20 November 2026", key: "welloby.terms", url: "terms.html" };
+  const termsAccepted = () => store.get(TERMS.key) === TERMS.version;
+  const acceptTerms = () => store.set(TERMS.key, TERMS.version);
+  function termsGate(u) {
+    if (!u || termsAccepted() || /\/terms(\.html)?$/.test(location.pathname) || $("[data-terms-gate]")) return;
+    const d = document.createElement("dialog");
+    if (typeof d.showModal !== "function") return;
+    d.className = "terms-gate notch";
+    d.setAttribute("data-terms-gate", "");
+    d.setAttribute("aria-labelledby", "terms-gate-title");
+    d.innerHTML = `<p class="kicker">New terms · ${TERMS.label}</p>
+      <h2 id="terms-gate-title">Accept the Welloby terms</h2>
+      <p>Welloby now has terms for the server, the Discord and this site. The short version: staff can ban anyone, for any reason. You play at your own risk, and Welloby isn't responsible for what you lose.</p>
+      <p><a href="${TERMS.url}" target="_blank" rel="noopener">Read the full terms</a></p>
+      <form method="dialog" class="terms-gate-acts">
+        <button class="btn btn-lava" value="accept">I agree</button>
+        <button class="btn btn-line" value="signout">Sign out instead</button>
+      </form>`;
+    /* closing it any way other than "I agree" (Esc included) counts as declining and signs you out */
+    d.addEventListener("close", () => {
+      if (d.returnValue === "accept") acceptTerms();
+      else signOut(false);
+      d.remove();
+    });
+    document.body.append(d);
+    d.showModal();
+  }
+  subs.add(termsGate);
+  /* agreeing in another tab closes the prompt here too */
+  addEventListener("storage", e => {
+    const g = $("[data-terms-gate]");
+    if (e.key === TERMS.key && g && termsAccepted()) { g.returnValue = "accept"; g.close(); }
+  });
+
   /* ---------- the Community section on the main page ---------- */
   const teaser = $("[data-community]");
   async function fillTeaser() {
@@ -380,5 +415,6 @@
     esc, fmt, money, ago, when, plural, format, plain,
     head, headURL, banner, bannerURL, parseBanner, bannerSpec, randomBanner, COLORS, PATTERNS, PATTERN_NAMES, REACT,
     who, ctag, badges, userHref, clanHref, hash32,
+    TERMS, termsAccepted, acceptTerms,
   };
 })();
