@@ -377,10 +377,31 @@
     d.showModal();
   }
   subs.add(termsGate);
-  /* agreeing in another tab closes the prompt here too */
+  /* Visitors who aren't signed in get a small notice instead, which doesn't stop them browsing
+     (asked for in the advertising session, 20 Nov 2026). Its OK is the same acceptance on this
+     device as a member's "I agree"; members keep the dialog above. */
+  function termsBar() {
+    const old = $("[data-terms-bar]");
+    if (me || termsAccepted() || /\/terms(\.html)?$/.test(location.pathname)) { if (old) old.remove(); return; }
+    if (old) return;
+    const bar = document.createElement("div");
+    bar.className = "terms-bar notch";
+    bar.setAttribute("data-terms-bar", "");
+    bar.setAttribute("role", "region");
+    bar.setAttribute("aria-label", "Terms of use");
+    bar.innerHTML = `<p>By using this site, playing on Welloby or joining its Discord, you accept the <a href="${TERMS.url}">Terms</a>.</p><button type="button" class="btn btn-lava btn-s" data-terms-ok>OK</button>`;
+    bar.querySelector("[data-terms-ok]").addEventListener("click", () => { acceptTerms(); bar.remove(); });
+    document.body.append(bar);
+  }
+  subs.add(termsBar);
+  if (!token) termsBar();   // no saved session at all: show it straight away
+  ready.then(termsBar);     // otherwise wait until sign-in is known, so members never see it flash
+  /* agreeing in another tab closes the prompt and the notice here too */
   addEventListener("storage", e => {
+    if (e.key !== TERMS.key) return;
     const g = $("[data-terms-gate]");
-    if (e.key === TERMS.key && g && termsAccepted()) { g.returnValue = "accept"; g.close(); }
+    if (g && termsAccepted()) { g.returnValue = "accept"; g.close(); }
+    termsBar();
   });
 
   /* ---------- the Community section on the main page ---------- */

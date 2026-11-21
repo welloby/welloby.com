@@ -530,6 +530,13 @@ h1 .tr-flag .i{width:.5em;height:.5em;margin-right:.15em}
 .terms-gate a{font-weight:700;color:var(--ember);text-underline-offset:3px}
 .terms-gate-acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 .terms-gate .btn-line{color:var(--ink);border-color:var(--ink)}
+/* the notice for visitors who aren't signed in (termsBar in community-core.js): between the back-to-top
+   button on the left and Ask kevzy on the right, and above both on a phone */
+.terms-bar{--n:10px;position:fixed;left:84px;right:200px;bottom:max(16px,env(safe-area-inset-bottom));z-index:80;display:flex;align-items:center;justify-content:space-between;gap:14px;max-width:680px;margin:0 auto;padding:10px 12px 10px 18px;background:var(--bone);color:var(--ink);box-shadow:0 18px 50px rgba(0,0,0,.45);font-size:14.5px;line-height:1.45}
+.terms-bar p{margin:0}
+.terms-bar a{color:var(--ember);font-weight:700;text-underline-offset:3px}
+.terms-bar .btn{flex:none;min-width:64px;justify-content:center}
+@media (max-width:700px){.terms-bar{left:12px;right:12px;bottom:calc(max(12px,env(safe-area-inset-bottom)) + 64px);font-size:13.5px}}
 /* sign-in with Google, Discord, Facebook: each in its own colours, as their guidelines ask */
 .social-in{display:grid;gap:8px}
 .btn-social{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:46px;padding:10px 16px;border:1px solid transparent;font:600 15.5px/1.2 var(--body);cursor:pointer;transition:filter .15s,transform .15s}
