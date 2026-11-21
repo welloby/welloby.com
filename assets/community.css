@@ -583,6 +583,20 @@ h1 .tr-flag .i{width:.5em;height:.5em;margin-right:.15em}
 .next .i{width:24px;height:24px;color:var(--lava)}
 .next b{font:800 24px/1.05 var(--display)}
 .next span{font-size:14.5px;color:var(--ash)}
+/* getting started: the welcome steps under the page title until they're done (startBar in community.js) */
+.startbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin-bottom:clamp(22px,2.8vw,36px);padding:10px 8px 10px 16px;background:var(--basalt);border:1px solid var(--stone);border-left:3px solid var(--lava)}
+.startbar-t{display:grid;gap:3px;margin:0}
+.startbar-t b{font:800 19px/1.05 var(--display)}
+.startbar-t small{font:500 12px/1.2 var(--mono);color:var(--ash)}
+.startbar-steps{display:flex;flex-wrap:wrap;gap:8px;flex:1 1 420px;margin:0;padding:0;list-style:none}
+.startbar-steps a{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:7px 12px;background:var(--ink);border:1px solid var(--stone);color:var(--bone);font-weight:600;font-size:15px;text-decoration:none;transition:border-color .15s}
+.startbar-steps a:hover,.startbar-steps a[aria-current=page]{border-color:var(--lava)}
+.startbar-steps .i{width:18px;height:18px;flex:none;color:var(--lava)}
+.startbar-steps .done a{color:var(--ash)}
+.startbar-steps .done .i{color:var(--ok)}
+.startbar-x{display:grid;place-items:center;width:40px;height:40px;margin-left:auto;padding:0;background:none;border:0;color:var(--ash);cursor:pointer}
+.startbar-x:hover{color:var(--bone)}
+.startbar-x .i{width:18px;height:18px}
 
 /* ---------- settings and staff ---------- */
 .settings{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start;padding-bottom:90px}
@@ -754,6 +768,10 @@ h1 .tr-flag .i{width:.5em;height:.5em;margin-right:.15em}
   .stats,.cmt-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .pagehead .wrap{grid-template-columns:1fr}
   .pagehead .pagehead-act{grid-column:1;grid-row:auto;justify-self:start;margin-top:18px}
+  .startbar{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:12px 8px 12px 14px}
+  .startbar-x{grid-column:2;grid-row:1}
+  .startbar-steps{grid-column:1/-1;grid-row:2;display:grid;gap:6px}
+  .startbar-steps a{display:flex}
   .post,.post-gone{grid-template-columns:1fr}
   .post-side{grid-template-columns:auto auto 1fr;justify-items:start;align-items:center;gap:4px 10px;padding:10px 14px;border-right:0;border-bottom:1px solid var(--bone-rule);text-align:left}
   .post-head .hd,.post-side>.hd{width:40px;height:40px}

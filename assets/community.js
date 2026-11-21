@@ -53,6 +53,7 @@
   }
   function show(html, title, after) {
     app.innerHTML = `<div class="cm-view">${html}</div>`;
+    placeStart();
     document.title = (title ? title + " \u00b7 " : "") + "Welloby community";
     if (after) after();
     $$(".cm-view .glow, .cm-view [data-stagger] > *").forEach((el, i) => el.style.setProperty("--i", Math.min(i, 14)));
@@ -115,6 +116,50 @@
   });
   app.addEventListener("click", e => { const s = e.target.closest(".spoiler"); if (s) s.classList.add("open"); });
   app.addEventListener("keydown", e => { const s = e.target.closest(".spoiler"); if (s && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); s.classList.add("open"); } });
+
+  /* ---------- getting started ----------
+     The three steps from the welcome page sit under the page title of the community pages until
+     they're all done or the player hides them, so the next one is always a click away. */
+  const startKey = u => "welloby.start." + u.id;
+  const startSteps = u => [
+    { href: "#/settings", icon: "i-edit", label: "Set up your profile", done: !!(u.bio || (u.tags || []).length || u.since || u.avatar) },
+    { href: "#/clans", icon: "i-users", label: "Find a clan", done: !!(u.clan || (u.requested || []).length) },
+    { href: "#/new/general", icon: "i-chat", label: "Say hi on the board", done: (u.posts || 0) + (u.threads || 0) > 0 },
+  ];
+  const startSig = u => startSteps(u).map(s => (s.done ? 1 : 0)).join("");
+  function startBar(u) {
+    const steps = startSteps(u), done = steps.filter(s => s.done).length, here = "#" + parse().path;
+    return `<nav class="startbar wrap" aria-label="Getting started" data-start="${startSig(u)}">
+      <p class="startbar-t"><b>Getting started</b><small>${done} of ${steps.length} done</small></p>
+      <ol class="startbar-steps">${steps.map(s => `<li${s.done ? ' class="done"' : ""}><a href="${s.href}"${s.href === here ? ' aria-current="page"' : ""}>${icon(s.done ? "i-check" : s.icon)}<span>${s.label}</span>${s.done ? '<span class="sr-only"> (done)</span>' : ""}</a></li>`).join("")}</ol>
+      <button type="button" class="startbar-x" data-startx aria-label="Hide these steps" title="Hide these steps">${icon("i-x")}</button></nav>`;
+  }
+  function startDone(u) { store.set(startKey(u), ""); toast("You're all set. Welcome to Welloby!"); }
+  let startLooked = 0;
+  function placeStart() {
+    const u = me();
+    if (!u || store.get(startKey(u)) !== "on") return;
+    const top = $(".cm-view > .pagehead, .cm-view > .mast", app);   // the sign-in pages and the welcome page have neither
+    if (!top) return;
+    if (!startSig(u).includes("0")) { startDone(u); return; }
+    top.insertAdjacentHTML("afterend", startBar(u));
+    // posts and clan requests change on the server: look again now and then (the bar follows below)
+    if (Date.now() - startLooked > 15000) { startLooked = Date.now(); WC.refreshMe(); }
+  }
+  /* each time the account is fetched again (saving the profile, joining a clan, the look above), tick steps off in place */
+  WC.onAuth(u => {
+    const bar = $(".startbar", app);
+    if (!bar || !u || bar.dataset.start === startSig(u)) return;
+    if (startSig(u).includes("0")) bar.outerHTML = startBar(u);
+    else { bar.remove(); startDone(u); }
+  });
+  app.addEventListener("click", e => {
+    const x = e.target.closest("[data-startx]");
+    if (!x || !me()) return;
+    store.set(startKey(me()), "");
+    x.closest(".startbar").remove();
+    toast("Hidden. Settings, Clans and the board are always in the menu.");
+  });
 
   /* ---------- shared bits ---------- */
   const errBox = () => '<p class="form-err" role="alert" hidden></p>';
@@ -1625,6 +1670,7 @@
   page(/^\/welcome$/, async (m, q) => {
     const u = me();
     if (!u) { go("#/register"); return; }
+    store.set(startKey(u), "on");
     const a = u.account || {};
     const mailNote = a.email && !a.emailVerified
       ? `<p class="mail-note">${q.get("mail") === "1" ? `We sent a link to <b>${esc(a.email)}</b>. Open it to confirm your email; it's how you get back in if you ever forget your password.` : `Your email isn't confirmed yet. You can send the link from <a href="#/settings">Settings</a>.`}</p>` : "";
@@ -1640,6 +1686,7 @@
             <li><a href="#/clans" class="glow">${icon("i-users")}<b>Find a clan</b><span>Or found your own and design its banner.</span></a></li>
             <li><a href="#/new/general" class="glow">${icon("i-chat")}<b>Say hi on the board</b><span>Introduce yourself, or complain about the skeleton that killed you.</span></a></li>
           </ul>
+          <p class="muted">These three stay at the top of the community pages until they're done, so there's no need to come back here.</p>
           ${nextHash(q) ? `<p><a class="btn btn-lava" href="${esc(nextHash(q))}">Back to where you were</a></p>` : ""}
         </div>
       </section>`, "Welcome", () => setTimeout(() => burstAt($("[data-face]", app), 40), 250));
