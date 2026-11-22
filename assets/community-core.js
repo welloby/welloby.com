@@ -60,7 +60,8 @@
     return me;
   }
   async function signOut(everywhere) {
-    try { await api(everywhere ? "/auth/logout-all" : "/auth/logout", { method: "POST", body: {} }); } catch (e) { /* signed out locally anyway */ }
+    const endpoint = await pushDrop();   // this browser stops getting the account's notifications; the API is told which address to forget
+    try { await api(everywhere ? "/auth/logout-all" : "/auth/logout", { method: "POST", body: endpoint ? { endpoint } : {} }); } catch (e) { /* signed out locally anyway */ }
     setSession(null, null);
   }
   const ready = (async () => {
@@ -79,6 +80,129 @@
   })();
   /* another tab signed in or out */
   addEventListener("storage", e => { if (e.key === KEY) { token = e.newValue; refreshMe(); } });
+
+  /* ---------- phone notifications ----------
+     sw.js (next to the pages) shows them. This part switches them on and off for this browser and keeps the
+     API's copy of the browser's push address in step. The browser is asked for permission only when the
+     player taps the button in Settings; nothing here runs in a preview build or a page opened from disk. */
+  const PUSH_KEY = "welloby.push";   // { u: account id, e: push address, at: when the API last got it }; there only while notifications are on in this browser
+  const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);   // an iPad says it is a Mac
+  const standalone = () => navigator.standalone === true || matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches;
+  const pushCapable = () => !W.preview && /^https?:$/.test(location.protocol) && window.isSecureContext === true
+    && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  const pushKey = () => (health && typeof health.push === "string" ? health.push : "");
+  const pushFlag = () => { try { const f = JSON.parse(store.get(PUSH_KEY) || "null"); return f && typeof f.u === "number" ? f : null; } catch (e) { return null; } };
+  const setDevices = n => { if (me && me.account && typeof n === "number") me.account.pushDevices = n; };
+  /* Which state the Notifications card in Settings is in. No browser calls in here, so tests/push.test.js can run it. */
+  function pushStateOf(x) {
+    if (!x.key) return "server-off";
+    if (!x.capable) return x.ios && !x.standalone ? "ios-install" : "unsupported";
+    if (x.permission === "denied") return "blocked";
+    return x.permission === "granted" && x.subscribed && x.flagUser === x.userId ? "on" : "off";
+  }
+  async function pushState() {
+    const x = { key: pushKey(), capable: pushCapable(), ios: IOS, standalone: standalone(), permission: "default", subscribed: false, flagUser: (pushFlag() || {}).u, userId: me ? me.id : 0 };
+    if (x.key && x.capable) {
+      x.permission = Notification.permission;
+      try { const reg = await navigator.serviceWorker.getRegistration(); x.subscribed = !!(reg && await reg.pushManager.getSubscription()); } catch (e) { x.subscribed = false; }
+    }
+    return pushStateOf(x);
+  }
+  const keyBytes = s => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), ch => ch.charCodeAt(0));
+  /* a subscription made with another key (the keys were changed, or it comes from a test copy of the site) is no use with this one */
+  function sameKey(sub) {
+    const k = sub.options && sub.options.applicationServerKey;
+    if (!k) return true;
+    const a = new Uint8Array(k), b = keyBytes(pushKey());
+    return a.length === b.length && a.every((v, i) => v === b[i]);
+  }
+  async function pushSubscription() {
+    const reg = await navigator.serviceWorker.register("sw.js");
+    await Promise.race([navigator.serviceWorker.ready, new Promise((ok, no) => setTimeout(() => no(new Error("the service worker didn't start")), 8000))]);
+    let sub = await reg.pushManager.getSubscription();
+    if (sub && !sameKey(sub)) { await sub.unsubscribe(); sub = null; }
+    return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(pushKey()) });
+  }
+  async function pushSave(sub) {
+    const r = await api("/push/subscribe", { body: sub.toJSON() });
+    store.set(PUSH_KEY, JSON.stringify({ u: me.id, e: sub.endpoint, at: Date.now() }));
+    setDevices(r.devices);
+  }
+  /* Runs straight from the tap on "Turn on notifications". The permission question has to come before anything
+     is awaited, or Safari no longer counts it as the player's tap. Answers with the card's new state. */
+  async function pushOn() {
+    const asked = Notification.requestPermission();
+    await Promise.resolve(asked).catch(() => { /* answered below */ });
+    if (Notification.permission !== "granted") return pushState();
+    let sub = null;
+    try { sub = await pushSubscription(); await pushSave(sub); }
+    catch (e) { if (sub) sub.unsubscribe().catch(() => { /* gone already */ }); throw e; }
+    return "on";
+  }
+  /* forgets the subscription in this browser and answers with its address, so the API can forget it too */
+  async function pushDrop() {
+    store.set(PUSH_KEY, null);
+    try {
+      const reg = pushCapable() ? await navigator.serviceWorker.getRegistration() : null;
+      const sub = reg ? await reg.pushManager.getSubscription() : null;
+      if (!sub) return "";
+      sub.unsubscribe().catch(() => { /* gone already */ });
+      return sub.endpoint;
+    } catch (e) { return ""; }
+  }
+  async function pushOff() {
+    const endpoint = await pushDrop();
+    if (!endpoint || !token) return;
+    try { setDevices((await api("/push/unsubscribe", { body: { endpoint } })).devices); } catch (e) { /* the address is dead either way; the API drops it at the next send */ }
+  }
+  /* With notifications on, every page load looks the subscription up again: iPhones drop one without telling
+     the page, and the API forgets an account's devices when its password changes. The address goes to the API
+     when it changed, once a day, when the API says it has none, or when Settings asks (force). */
+  let pushSyncing = null, pushForced = false;
+  function pushSync(force) {
+    // Settings opened straight from another page finds the page-load look still going: its resend follows that one instead of being lost in it
+    if (pushSyncing && force && !pushForced) return pushSyncing.then(() => pushSync(true));
+    if (!pushSyncing) {
+      pushForced = !!force;
+      pushSyncing = (async () => {
+        const f = pushFlag();
+        if (!f || !me || !pushKey() || !pushCapable()) return;
+        if (f.u !== me.id || Notification.permission !== "granted") { await pushDrop(); return; }   // another account's leftovers, or the permission was taken back in the browser
+        try {
+          const sub = await pushSubscription();
+          const none = !!me.account && me.account.pushDevices === 0;
+          if (force || none || sub.endpoint !== f.e || Date.now() - f.at > 864e5) await pushSave(sub);
+        } catch (e) { /* offline, or the push service is: the next page load tries again */ }
+      })().finally(() => { pushSyncing = null; });
+    }
+    return pushSyncing;
+  }
+  /* follows sign-ins and sign-outs wherever they happen (this tab, another tab, a session that ran out) */
+  let pushSeen = -1, pushHealed = false;
+  function pushWatch() {
+    if (!token) { pushSeen = 0; if (pushFlag()) pushDrop(); return; }   // signed out for certain: this browser goes quiet
+    if (!me || !health) return;   // not known yet, or the API can't be reached: leave everything as it is
+    const lost = !pushHealed && !!pushFlag() && !!me.account && me.account.pushDevices === 0;
+    if (me.id === pushSeen && !lost) return;
+    pushSeen = me.id;
+    if (lost) pushHealed = true;   // once per page load, so an API that keeps refusing isn't asked over and over
+    pushSync(false);
+  }
+  subs.add(pushWatch);
+  /* a tapped notification: the service worker asks an open Welloby tab to show the chat or thread. Chrome throws
+     on merely reading navigator.serviceWorker in a sandboxed frame (where the preview build is shown), and that
+     would stop this whole file. */
+  if (pushCapable()) {
+    try {
+      navigator.serviceWorker.addEventListener("message", e => {
+        const d = e.data || {};
+        if (d.welloby !== "open" || typeof d.u !== "string" || d.u[0] !== "/") return;
+        if (!ON_HUB) location.href = HUB + "#" + d.u;
+        else if (location.hash === "#" + d.u) dispatchEvent(new Event("hashchange"));   // already on it: load it again
+        else location.hash = "#" + d.u;
+      });
+    } catch (e) { /* no service workers here, so no notifications to tap */ }
+  }
 
   /* ---------- seeded randomness ---------- */
   function hash32(s) {
@@ -444,5 +568,6 @@
     head, headURL, banner, bannerURL, parseBanner, bannerSpec, randomBanner, COLORS, PATTERNS, PATTERN_NAMES, REACT,
     who, ctag, badges, userHref, clanHref, hash32,
     TERMS, termsAccepted, acceptTerms,
+    push: { state: pushState, stateOf: pushStateOf, on: pushOn, off: pushOff, sync: pushSync, test: () => api("/push/test", { body: {} }), ios: IOS, standalone },
   };
 })();

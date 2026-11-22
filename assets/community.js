@@ -148,7 +148,7 @@
   }
   /* each time the account is fetched again (saving the profile, joining a clan, the look above), tick steps off in place */
   WC.onAuth(u => {
-    const bar = $(".startbar", app);
+    const bar = $("[data-start]", app);   // not just .startbar: the notifications nudge in the inbox looks the same
     if (!bar || !u || bar.dataset.start === startSig(u)) return;
     if (startSig(u).includes("0")) bar.outerHTML = startBar(u);
     else { bar.remove(); startDone(u); }
@@ -1320,8 +1320,9 @@
     if (stale()) return;
     setUnread(d.unread);
     show(`
-      <section class="pagehead"><div class="wrap"><p class="kicker">Private</p><h1>Messages</h1>
+      <section class="pagehead"><div class="wrap">${crumbs([["#/", "Community"], [null, "Messages"]])}<p class="kicker">Private</p><h1>Messages</h1>
         <p class="pagehead-lede">Chats with players, your groups and your clan. Only the people in a chat can read it.</p></div></section>
+      <div data-pushask hidden></div>
       <div class="wrap msgs">
         <div class="msgs-start">
           <form class="card form msg-new" data-newdm><h2>Message a player</h2>
@@ -1343,6 +1344,11 @@
       const members = f.members.value.split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
       try { const r = await api("/chats", { body: { title: f.title.value, members } }); go("#/messages/" + r.id); } catch (err) { formErr(f, err.message); }
     }));
+    // shown where notifications can be turned on and aren't yet, until the player hides it; the asking itself happens in Settings
+    if (store.get("welloby.pushask") !== "1") {
+      WC.push.state().then(s => { const slot = $("[data-pushask]", app); if (!stale() && slot && (s === "off" || s === "ios-install")) slot.outerHTML = pushAsk(s); });
+    }
+    on("click", "[data-pushaskx]", (e, b) => { store.set("welloby.pushask", "1"); b.closest("[data-pushask]").remove(); });
     every(20000, async () => {
       try {
         const r = await api("/chats");
@@ -1587,6 +1593,42 @@
       try { await api(`/chats/${ch.id}`, { method: "PATCH", body: { hidden: true } }); toast("Hidden. It comes back if they write again."); go("#/messages"); } catch (err) { toast(err.message); }
     }));
   }
+
+  /* ---------- phone notifications: the card in Settings and the nudge in the inbox ----------
+     community-core.js (WC.push) does the work; the states are the ones its pushStateOf names. */
+  const NOTIFY_KINDS = [["dm", "Private messages"], ["group", "Group chats"], ["clan", "Clan chat"], ["reply", "Replies to my threads"]];   // worker.js NOTIFY
+  // the browser can keep a community-core.js from before notifications for a few minutes after an upload: the card then says they aren't on yet
+  if (!WC.push) WC.push = { ios: false, standalone: () => false, state: async () => "server-off", sync: async () => {} };
+  function pushCard(state, a) {
+    const ios = WC.push.ios;
+    const others = (a.pushDevices || 0) - (state === "on" ? 1 : 0);
+    const words = {
+      "server-off": '<p class="fine">Notifications aren\'t switched on yet.</p>',
+      "ios-install": `<p>On an iPhone or iPad, put Welloby on your Home Screen first.</p>
+        <ol class="steps-mini"><li>In Safari, tap Share ${icon("i-share")}. Can't see it? Tap the three dots first.</li><li>Tap <b>Add to Home Screen</b>.</li><li>Open Welloby from the new icon and sign in there.</li><li>Come back to Settings and turn on notifications.</li></ol>
+        <p class="fine">Not in Safari? Open welloby.com in Safari first. You need iOS 16.4 or newer.</p>`,
+      unsupported: `<p class="fine">${ios ? "Notifications need iOS 16.4 or newer. Update your iPhone or iPad, then come back here." : "This browser can't show notifications. Open welloby.com in Chrome, Firefox, Edge or Safari."}</p>`,
+      blocked: `<p class="mail-note">Notifications are blocked for Welloby on this device.</p>
+        <p class="fine">${ios ? "To allow them: open the Settings app, tap Notifications, tap Welloby and turn on Allow Notifications. Then open Welloby again."
+          : WC.push.standalone() ? "To allow them: open your phone's settings, tap Apps, tap Welloby and allow notifications. Then open Welloby again."
+          : "To allow them: tap the icon next to the address at the top, find Notifications and choose Allow. Then load this page again."}</p>`,
+      off: `<p class="fine">Get a notification on this device when someone writes to you.</p>${errBox()}
+        <p class="form-acts"><button type="button" class="btn btn-lava" data-pushon>Turn on notifications</button></p>`,
+      on: `<p class="req-sent">${icon("i-check")}Notifications are on for this device</p>${errBox()}
+        <p class="form-acts"><button type="button" class="btn btn-ink" data-pushtest>Send a test</button><button type="button" class="btn btn-line" data-pushoff>Turn off</button></p>`,
+    }[state] || "";
+    const also = others > 0 ? `<p class="fine">${state === "on" ? "Also on" : "On"} for ${plural(others, "other device")}.</p>` : "";
+    const kinds = state === "on" || a.pushDevices > 0 ? `<form class="form" data-kinds><h3 class="mini">Tell me about</h3>
+        ${NOTIFY_KINDS.map(([v, l]) => `<label class="fld-check"><input type="checkbox" name="notify" value="${v}"${(a.notify || []).includes(v) ? " checked" : ""}><span>${l}</span></label>`).join("")}
+        <p class="fine">This is for every device where your notifications are on. Muted chats stay quiet.</p>
+        ${errBox()}<p class="form-acts"><button class="btn btn-ink" type="submit">Save</button></p></form>` : "";
+    return words + also + kinds;
+  }
+  // placed like the getting-started bar, between the page title and the page, so it gets that bar's spacing
+  const pushAsk = state => `<div class="startbar wrap" data-pushask>
+      <p class="startbar-t"><b>Notifications</b><small>${state === "ios-install" ? "On iPhone, add Welloby to your Home Screen" : "Know when someone writes to you"}</small></p>
+      <a class="btn btn-lava btn-s" href="#/settings?p=notify">${state === "ios-install" ? "Show me how" : "Turn on"}</a>
+      <button type="button" class="startbar-x" data-pushaskx aria-label="Hide this" title="Hide this">${icon("i-x")}</button></div>`;
 
   /* ======================================================== SUPPORTERS */
   page(/^\/supporters\/?$/, async (m, q, stale) => {
@@ -2039,7 +2081,7 @@
     if (!u0) { show(`<section class="pagehead"><div class="wrap"><h1>Settings</h1></div></section><div class="wrap narrow">${needSignIn("to change your settings")}</div>`, "Settings"); return; }
     const u = await WC.refreshMe();
     if (stale() || !u) return;
-    const a = Object.assign({ email: "", emailVerified: false, recovery: "", recoveryVerified: false, hasPassword: true, linked: [] }, u.account || {});
+    const a = Object.assign({ email: "", emailVerified: false, recovery: "", recoveryVerified: false, hasPassword: true, linked: [], notify: NOTIFY_KINDS.map(k => k[0]), pushDevices: 0 }, u.account || {});
     const mailOn = health().mail !== false;
     const ps = providers();
     let avatar = u.avatar || 0;
@@ -2055,7 +2097,7 @@
     };
     const via = a.linked.map(l => brandName(l.provider)).join(" or ") || "another site";
     show(`
-      <section class="pagehead"><div class="wrap"><p class="kicker">${esc(u.name)}</p><h1>Settings</h1></div></section>
+      <section class="pagehead"><div class="wrap">${crumbs([["#/", "Community"], [null, "Settings"]])}<p class="kicker">${esc(u.name)}</p><h1>Settings</h1></div></section>
       <div class="wrap settings">
         <div class="settings-main">
           <form class="card form" data-profile>
@@ -2104,6 +2146,7 @@
             <p class="fine">Chats you already have keep working, and the staff can always reach you. To stop one player, block them from your chat with them.</p>
             ${errBox()}<p class="form-acts"><button class="btn btn-ink" type="submit">Save</button></p>
             <h3 class="mini">Blocked players</h3><div data-blocks><p class="muted">Loading...</p></div></form>
+          <div class="card form" id="pnotify"><h2>Notifications</h2><div class="form" data-push aria-live="polite"><p class="muted">Loading...</p></div></div>
           <div class="card form"><h2>Sessions</h2><p class="fine">Signed in on a computer that isn't yours?</p><p class="form-acts"><button type="button" class="btn btn-line" data-everywhere>Sign out everywhere</button></p></div>
           <form class="card form danger-zone" data-delete><h2>Delete account</h2>
             <p class="fine">Your name, email, profile, sign-ins and clan role go, and you leave your group chats. Your posts and messages stay up as "Deleted player" so threads and chats still make sense. If you lead a clan, the next officer takes over.</p>
@@ -2118,6 +2161,46 @@
         : '<p class="muted">Nobody. Block someone from your chat with them.</p>';
     };
     api("/blocks").then(r => { if (!stale()) paintBlocks(r.blocked); }).catch(() => paintBlocks([]));
+    const PUSH_FAIL = "Notifications couldn't be turned on. Check your connection and try again.";
+    const paintPush = async () => {
+      const state = await WC.push.state();
+      const box = $("[data-push]", app);
+      if (!stale() && box) box.innerHTML = pushCard(state, (me() || {}).account || a);
+    };
+    // opening Settings always sends this device's push address again, in case the API lost it
+    WC.push.sync(true).then(paintPush, paintPush);
+    on("click", "[data-pushon]", (e, b) => busy(b, async () => {
+      const box = b.closest("[data-push]");
+      formErr(box, "");
+      try {
+        const state = await WC.push.on();   // first thing after the tap: the browser's question has to come from the tap itself
+        toast(state === "on" ? "Notifications are on" : state === "blocked" ? "Notifications are blocked" : "Still off. Choose Allow when your browser asks.");
+      } catch (err) { formErr(box, err instanceof WC.ApiError ? err.message : PUSH_FAIL); return; }
+      await paintPush();
+    }));
+    on("click", "[data-pushoff]", (e, b) => busy(b, async () => {
+      await WC.push.off();
+      store.set("welloby.pushask", "1");   // switched off on purpose, so the inbox stops suggesting them
+      toast("Notifications are off on this device");
+      await paintPush();
+    }));
+    on("click", "[data-pushtest]", (e, b) => busy(b, async () => {
+      const box = b.closest("[data-push]");
+      formErr(box, "");
+      try {
+        const r = await WC.push.test();
+        if (r.sent) toast("Sent. It should arrive in a few seconds.");
+        else formErr(box, "The test didn't get through. Turn notifications off and on again.");
+      } catch (err) { formErr(box, err.message); }
+    }));
+    on("submit", "[data-kinds]", (e, f) => busy($("button[type=submit]", f), async () => {
+      formErr(f, "");
+      try {
+        const r = await api("/me", { method: "PATCH", body: { notify: $$("input[name=notify]:checked", f).map(i => i.value) } });
+        WC.setSession(store.get("welloby.session"), r.user);
+        toast("Saved");
+      } catch (err) { formErr(f, err.message); }
+    }));
     on("submit", "[data-dmprefs]", (e, f) => busy($("button[type=submit]", f), async () => {
       formErr(f, "");
       try {
