@@ -20,6 +20,11 @@
 .acct-msg:hover{border-color:var(--lava);color:var(--lava-hot)}
 .acct-msg .i{width:19px;height:19px}
 .acct-msg .acct-dot{position:absolute;top:-8px;right:-8px;min-width:18px;height:18px;padding:0 4px;font-size:11px}
+/* Back, only in the Home Screen app (community-core.js, mountBack); on a phone it takes the wordmark's place */
+.app-back{display:none}
+.bar.has-back .app-back{display:inline-flex;align-items:center;gap:6px;flex:none;min-height:44px;padding:0 13px 0 10px;border:1px solid rgba(243,236,219,.28);background:rgba(23,22,20,.55);color:var(--bone);font-weight:700;font-size:15px;line-height:1}
+.bar.has-back .app-back:hover{border-color:var(--lava);color:var(--lava-hot)}
+@media (max-width:560px){.bar.has-back .bar-brand{display:none}}
 
 /* ---------- block heads, banners, badges ---------- */
 .hd{display:inline-block;flex:none;vertical-align:middle;image-rendering:pixelated;image-rendering:crisp-edges;background:var(--basalt-2);box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}

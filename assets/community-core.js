@@ -204,6 +204,49 @@
     } catch (e) { /* no service workers here, so no notifications to tap */ }
   }
 
+  /* ---------- Back in the Home Screen app ----------
+     Opened from the Home Screen, Welloby has no browser bar, and an iPhone gives it no back swipe either, so while
+     it runs as an app every page gets a Back button at the left of the top bar (not on the community start page,
+     where the app opens). A tap goes back in the app's own history. When that changes nothing (the page the app
+     opened on), it goes up a level instead. A normal browser tab never gets the button. */
+  /* where Back goes when there is no history to go back to: x.hub (on the community page), x.hash (its route),
+     x.crumb (the last link of the page's breadcrumb), x.chat (a chat's own \u2190 link). No browser calls in here,
+     so tests/appback.test.js can run it. */
+  function backTo(x) {
+    if (!x.hub) return "community";
+    const up = x.crumb || x.chat || "";
+    return /^#\//.test(up) && up !== x.hash ? up : "#/";
+  }
+  const appStart = () => ON_HUB && /^(#\/?)?$/.test(location.hash);
+  let backTimer = 0;
+  function appBack() {
+    const before = location.href;
+    clearTimeout(backTimer);
+    history.back();
+    backTimer = setTimeout(() => {
+      if (location.href !== before) return;   // the history step happened
+      const crumbs = $$(".crumbs a"), chat = $(".chat-back");
+      location.href = backTo({ hub: ON_HUB, hash: location.hash, crumb: crumbs.length ? crumbs[crumbs.length - 1].getAttribute("href") : "", chat: chat ? chat.getAttribute("href") : "" });
+    }, 350);
+  }
+  function mountBack() {
+    const bar = $("header.bar");
+    if (!bar || !standalone()) return;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "app-back";
+    btn.innerHTML = '<svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8H3m4.5-4.5L3 8l4.5 4.5"/></svg><span>Back</span>';
+    btn.addEventListener("click", appBack);
+    const brand = $(".bar-brand", bar);
+    if (brand) brand.before(btn); else bar.prepend(btn);
+    const paint = () => bar.classList.toggle("has-back", !appStart());
+    paint();
+    addEventListener("hashchange", paint);
+    addEventListener("pagehide", () => clearTimeout(backTimer));   // a page kept for going back to must not move by itself when it comes back
+  }
+  mountBack();
+
+
   /* ---------- seeded randomness ---------- */
   function hash32(s) {
     let h = 2166136261 >>> 0;
@@ -569,5 +612,6 @@
     who, ctag, badges, userHref, clanHref, hash32,
     TERMS, termsAccepted, acceptTerms,
     push: { state: pushState, stateOf: pushStateOf, on: pushOn, off: pushOff, sync: pushSync, test: () => api("/push/test", { body: {} }), ios: IOS, standalone },
+    backTo,
   };
 })();
