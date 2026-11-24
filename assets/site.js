@@ -1,21 +1,37 @@
-/* Welloby site behavior: copy buttons, live status, join tabs, navigation, hero embers. */
+/* Welloby site behavior: old links to moved sections, copy buttons, live status, join tabs, the phone menu,
+   "you are here", Help stepping aside, the daily restart in the visitor's own time. Every section is in the page
+   without this file; nothing here hides or moves anything. */
 (() => {
   "use strict";
   const W = window.WELLOBY || {};
   const PREVIEW = !!W.preview;
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+  const root = document.documentElement;
+  const query = new URLSearchParams(location.search);
 
-  /* ---------- toast ---------- */
+  /* ---------- old links: parts of the home page that now have their own pages ----------
+     Links already posted in Discord, on listing sites and in videos point at welloby.com/#map and the like, and the
+     community board writes index.html#map-x120-z-340 for coordinates. Without scripts they land on the matching card. */
+  const MOVED = { map: "map.html", games: "map.html#games", planner: "map.html#planner", world: "faq.html#server-info", watch: "watch.html", brand: "watch.html#brand" };
+  const movedTo = h => /^(map|at)-x-?\d+-z-?\d+$/.test(h) ? "map.html#" + h : MOVED[h] || "";
+  if (document.body.classList.contains("page-home")) {
+    const to = movedTo(location.hash.slice(1));
+    if (to) { location.replace(to); return; }
+    addEventListener("hashchange", () => { const t = movedTo(location.hash.slice(1)); if (t) location.replace(t); });
+  }
+
+  /* ---------- the Copied message: says where to paste (data-copy-where), stays 5 s, a tap closes it ---------- */
   const toastEl = $(".toast");
   let toastT = 0;
+  const hideToast = () => { clearTimeout(toastT); if (toastEl) toastEl.dataset.show = "0"; };
   function toast(text) {
     if (!toastEl) return;
     clearTimeout(toastT);
     toastEl.textContent = text; toastEl.dataset.show = "1";
-    toastT = setTimeout(() => { toastEl.dataset.show = "0"; }, 3200);
+    toastT = setTimeout(hideToast, 5000);
   }
+  if (toastEl) toastEl.addEventListener("click", hideToast);
   window.addEventListener("welloby:toast", e => toast(e.detail));
 
   /* ---------- copy ---------- */
@@ -31,12 +47,13 @@
       if (button) button.focus({ preventScroll: true });
     }
     if (ok) {
-      toast("Copied " + ((button && button.dataset.copyLabel) || text));
+      const where = button && button.dataset.copyWhere;
+      toast("Copied " + ((button && button.dataset.copyLabel) || text) + "." + (where ? " " + where : ""));
       if (button) {
         button.dataset.copied = "1";
         clearTimeout(button._t); button._t = setTimeout(() => { delete button.dataset.copied; }, 1600);
       }
-    } else toast(button && button.dataset.copyLabel ? "Couldn't copy here. Select the text and copy it yourself." : "Copy it yourself: " + text);
+    } else toast(text.length < 40 ? "Could not copy here. Select it and copy it yourself: " + text : "Your browser blocked copying. Select the text and copy it yourself.");
     return ok;
   }
   document.addEventListener("click", e => {
@@ -44,7 +61,7 @@
     if (b) copyText(b.dataset.copy, b);
   });
 
-  /* ---------- join ticket: edition tabs ---------- */
+  /* ---------- join: edition tabs ---------- */
   const server = W.server || {};
   const tabs = $$("[data-edition]");
   let edition = "java";
@@ -136,10 +153,12 @@
   document.addEventListener("visibilitychange", () => { if (!document.hidden && !PREVIEW && checkedAt && Date.now() - checkedAt > 120000) checkStatus(false); });
   if (tabs.length) showEdition("java"); else checkStatus(false);
 
-  /* ---------- top bar and section tracking ---------- */
+  /* ---------- "you are here": the section being read, in the second row and the menu ----------
+     Only links to a section of this page count; community.js marks the community's own pages (#/forum) itself, so
+     those links are left alone. Sections side by side (Rules and FAQ on a computer) are marked together. */
   const bar = $(".bar");
-  const links = $$(".bar-nav a[href^='#'], .menu-list a[href^='#']");
-  const sections = Array.from(new Set(links.map(a => a.hash))).map(h => document.getElementById(h.slice(1))).filter(Boolean);
+  const links = $$(".bar-nav a[href^='#'], .menu-list a[href^='#']").filter(a => a.hash.length > 1 && !a.hash.startsWith("#/") && document.getElementById(a.hash.slice(1)));
+  const sections = Array.from(new Set(links.map(a => document.getElementById(a.hash.slice(1)))));
   let ticking = false;
   function onScroll() {
     if (ticking) return;
@@ -147,12 +166,15 @@
     requestAnimationFrame(() => {
       ticking = false;
       if (bar) bar.dataset.solid = scrollY > 24 ? "1" : "0";
-      let current = null;
       const line = Math.min(innerHeight * 0.35, 260);
-      for (const s of sections) if (s.getBoundingClientRect().top <= line) current = s;
+      let top = -Infinity, current = [];
+      for (const s of sections) {
+        const t = s.getBoundingClientRect().top;
+        if (t > line) continue;
+        if (t > top + 4) { current = [s.id]; top = t; } else if (t >= top - 4) current.push(s.id);
+      }
       for (const a of links) {
-        const on = !!current && a.hash === "#" + current.id;
-        if (on) a.setAttribute("aria-current", "location"); else a.removeAttribute("aria-current");
+        if (current.includes(a.hash.slice(1))) a.setAttribute("aria-current", "location"); else a.removeAttribute("aria-current");
       }
     });
   }
@@ -160,11 +182,55 @@
   addEventListener("resize", onScroll, { passive: true });
   onScroll();
 
+  /* ---------- the phone menu (a <details>) ----------
+     It closes on a link, on Help and Search, on a tap outside it (not on the Copied message) and on Escape. While it is
+     open the page under it cannot take keyboard focus. It belongs to narrow screens, so widening past 960 px closes it.
+     ?menu=1 or #menu opens it, for links from elsewhere. */
   const menu = $(".menu");
   if (menu) {
-    menu.addEventListener("click", e => { if (e.target.closest("a")) menu.removeAttribute("open"); });
-    document.addEventListener("click", e => { if (menu.open && !menu.contains(e.target)) menu.removeAttribute("open"); });
-    document.addEventListener("keydown", e => { if (e.key === "Escape" && menu.open) { menu.removeAttribute("open"); $("summary", menu).focus(); } });
+    const under = () => $$("main, .local, .bar-sub, .site-foot, .kz, .terms-strip");
+    const syncInert = () => under().forEach(el => { el.inert = menu.open; });
+    /* frees the page at once, not on the later "toggle" event: Help closes the menu and the help bot takes focus in the same tap */
+    const closeMenu = () => { menu.removeAttribute("open"); syncInert(); };
+    // a message from before the menu opened would sit on its rows; one from inside it (Copied) still shows
+    menu.addEventListener("toggle", () => { syncInert(); if (menu.open) hideToast(); });
+    menu.addEventListener("click", e => { if (e.target.closest("a, [data-ask], [data-cmd-open]")) closeMenu(); });
+    document.addEventListener("click", e => { if (menu.open && !menu.contains(e.target) && !e.target.closest(".toast")) closeMenu(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape" && menu.open) { closeMenu(); $("summary", menu).focus(); } });
+    const wide = matchMedia("(min-width: 960px)");
+    const onWide = () => { if (wide.matches) closeMenu(); };
+    if (wide.addEventListener) wide.addEventListener("change", onWide); else if (wide.addListener) wide.addListener(onWide);
+    if (query.get("menu") === "1" || location.hash === "#menu") menu.setAttribute("open", "");
+  }
+
+  /* ---------- Help steps aside while buttons sit where it floats ----------
+     The first screen's address card (its Copy buttons are at the right edge; the first screen has its own Help
+     button), the community's Create account and Sign in, and the server list's Vote buttons. The class is set before
+     the help bot's button exists, so it never flashes over them. */
+  const aside = $$(".first .ipcard, .comm-acts, .slist");
+  if (aside.length) {
+    const inView = new Set();
+    aside.forEach(el => { const r = el.getBoundingClientRect(); if (r.bottom > 0 && r.top < innerHeight) inView.add(el); });
+    root.classList.toggle("card-in-view", inView.size > 0);
+    if ("IntersectionObserver" in window) {
+      const io = new IntersectionObserver(es => {
+        es.forEach(e => { if (e.isIntersecting) inView.add(e.target); else inView.delete(e.target); });
+        root.classList.toggle("card-in-view", inView.size > 0);
+      });
+      aside.forEach(el => io.observe(el));
+    }
+  }
+
+  /* ---------- a link to a closed question opens it ---------- */
+  const openRow = id => { const el = id && document.getElementById(id); if (el && el.tagName === "DETAILS") el.open = true; };
+  openRow(location.hash.slice(1));
+  addEventListener("hashchange", () => openRow(location.hash.slice(1)));
+
+  /* ---------- the daily restart, also in the visitor's own time (written once) ---------- */
+  const restart = $("[data-restart]");
+  if (restart) {
+    const now = new Date(), at = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 9, 40));
+    if (at.getTimezoneOffset() !== 0) restart.textContent = " (" + at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + " your time)";
   }
 
   /* ---------- brand kit ---------- */
@@ -173,56 +239,5 @@
       const a = e.target.closest("a[download], a[data-file]");
       if (a) { e.preventDefault(); toast("Downloads work once the site is hosted. This is a preview."); }
     });
-  }
-
-  /* ---------- hero embers: small square sparks rising off the lava ---------- */
-  const hero = $(".hero"), cv = $(".hero-embers"), art = $(".hero-art");
-  if (hero && cv && art && W.embers && W.embers.length && !reduced.matches) {
-    const g = cv.getContext("2d");
-    let w = 0, h = 0, dpr = 1, parts = [], run = false, last = 0, emit = [];
-    const colors = ["#ff6a1f", "#ff8a3d", "#ffb347", "#ffd27a"];
-    function layout() {
-      const r = hero.getBoundingClientRect();
-      w = r.width; h = r.height; dpr = Math.min(devicePixelRatio || 1, 2);
-      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
-      const iw = art.naturalWidth || 1672, ih = art.naturalHeight || 941, s = Math.max(w / iw, h / ih);
-      const pos = getComputedStyle(art).objectPosition.split(" ").map(v => parseFloat(v) / 100);
-      const ox = (w - iw * s) * (isNaN(pos[0]) ? .5 : pos[0]), oy = (h - ih * s) * (isNaN(pos[1]) ? .5 : pos[1]);
-      emit = W.embers.map(p => ({ x: ox + p[0] * iw * s, y: oy + p[1] * ih * s })).filter(p => p.x > 0 && p.x < w && p.y > 0 && p.y < h);
-    }
-    function spawn() {
-      if (!emit.length) return;
-      const e = emit[(Math.random() * emit.length) | 0];
-      parts.push({ x: e.x + (Math.random() - .5) * 10, y: e.y, vx: (Math.random() - .5) * 9, vy: -(14 + Math.random() * 26), life: 0, max: 2.6 + Math.random() * 3.2, s: Math.random() < .25 ? 3 : 2, c: colors[(Math.random() * colors.length) | 0], ph: Math.random() * 6.3 });
-    }
-    function tick(t) {
-      if (!run) return;
-      const dt = Math.min(.05, last ? (t - last) / 1000 : .016); last = t;
-      if (parts.length < 46 && Math.random() < dt * 9) spawn();
-      g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
-      parts = parts.filter(p => p.life < p.max);
-      for (const p of parts) {
-        p.life += dt; p.x += (p.vx + Math.sin(p.ph + p.life * 1.7) * 7) * dt; p.y += p.vy * dt;
-        const a = Math.min(1, p.life * 3) * Math.max(0, 1 - p.life / p.max);
-        g.globalAlpha = a * .9; g.fillStyle = p.c;
-        g.fillRect(Math.round(p.x), Math.round(p.y), p.s, p.s);
-      }
-      g.globalAlpha = 1;
-      requestAnimationFrame(tick);
-    }
-    /* the pointer stirs up extra sparks */
-    let lastPuff = 0;
-    hero.addEventListener("pointermove", e => {
-      if (e.pointerType !== "mouse" || parts.length > 90 || e.timeStamp - lastPuff < 40) return;
-      lastPuff = e.timeStamp;
-      const r = hero.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-      for (let i = 0; i < 2; i++) parts.push({ x: x + (Math.random() - .5) * 14, y: y + (Math.random() - .5) * 8, vx: (Math.random() - .5) * 30, vy: -(20 + Math.random() * 40), life: 0, max: .8 + Math.random() * 1.2, s: Math.random() < .3 ? 3 : 2, c: colors[(Math.random() * colors.length) | 0], ph: Math.random() * 6.3 });
-    });
-    const start = () => { if (!run) { run = true; last = 0; requestAnimationFrame(tick); } };
-    const stop = () => { run = false; };
-    new ResizeObserver(layout).observe(hero);
-    if (art.complete) layout(); else art.addEventListener("load", layout);
-    new IntersectionObserver(es => { for (const e of es) (e.isIntersecting && !document.hidden) ? start() : stop(); }).observe(hero);
-    document.addEventListener("visibilitychange", () => { if (document.hidden) stop(); else if (hero.getBoundingClientRect().bottom > 0) start(); });
   }
 })();

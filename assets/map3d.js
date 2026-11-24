@@ -1,6 +1,6 @@
-/* The main map: the live BlueMap of the world around spawn, shown inside the page.
+/* The main map: the live 3D map of the world around spawn, shown inside the page.
    Also the small messaging client that Spawn Guessr shares (window.wellobyMap3d).
-   The map page runs welloby-embed.js (in BlueMap's webroot), which answers these messages;
+   The map page runs welloby-embed.js (on the map server), which answers these messages;
    without it the map still shows, only the buttons that move the camera do nothing. */
 (() => {
   "use strict";
@@ -36,20 +36,28 @@
       if (d.wl === "ready" || d.wl === "camera") last = d;
       if (onEvent) onEvent(d);
     }
+    const onLoad = () => { ready = false; tries = 0; clearTimeout(timer); hello(); };
     addEventListener("message", onMsg);
-    frame.addEventListener("load", () => { ready = false; tries = 0; clearTimeout(timer); hello(); });
+    frame.addEventListener("load", onLoad);
     return {
       send(m) { if (ready) post(m); else { queue.push(m); if (queue.length > 20) queue.shift(); } },
+      /* stop talking to this frame (it is being emptied or loaded again by a new conversation) */
+      close() {
+        ready = false; clearTimeout(timer); queue.length = 0; onEvent = null;
+        if (typeof removeEventListener === "function") removeEventListener("message", onMsg);
+        if (frame.removeEventListener) frame.removeEventListener("load", onLoad);
+      },
       get ready() { return ready; },
       get camera() { return last; }
     };
   }
-  /* BlueMap reads its camera from the address: map:x:y:z:distance:rotation:angle:tilt:ortho:mode */
+  /* The 3D map reads its camera from the address: map:x:y:z:distance:rotation:angle:tilt:ortho:mode */
   const hashFor = v => "#" + [v.map || "world", Math.round(v.x || 0), Math.round(v.y == null ? 70 : v.y), Math.round(v.z || 0),
     Math.round(v.distance || 400), (v.rotation || 0).toFixed(2), (v.mode === "flat" ? 0 : (v.angle == null ? .8 : v.angle)).toFixed(2),
     0, v.mode === "flat" ? 1 : 0, v.mode || "perspective"].join(":");
   /* is the map reachable over a working connection right now (address up, certificate valid)?
-     Asked once, by loading one small picture from the map. */
+     Asked by loading one small picture from the map. A yes is kept; a no is forgotten, so the next
+     Try again asks afresh (a phone that lost its signal for a moment gets the map back without a reload). */
   let probe = null;
   function check() {
     if (!embeddable) return Promise.resolve(false);
@@ -59,29 +67,46 @@
       const img = new Image();
       img.onload = () => finish(true);
       img.onerror = () => finish(false);
-      setTimeout(() => finish(false), 8000);
+      setTimeout(() => finish(false), 15000);
       img.src = base + "assets/logo.png?check=" + Date.now();
     });
+    const asked = probe;
+    asked.then(up => { if (!up && probe === asked) probe = null; });
     return probe;
   }
-  window.wellobyMap3d = { url: base, fallback: M.fallback || base, origin, embeddable, connect, hashFor, check };
+  /* empty a frame; the promise settles once it is empty, so loading the same address next really loads the page
+     again (setting it back at once would only change its #, and the map page would stay as it was) */
+  function blank(frame) {
+    return new Promise(done => {
+      let over = false;
+      const end = () => { if (!over) { over = true; done(); } };
+      if (frame.addEventListener) frame.addEventListener("load", end, { once: true });
+      setTimeout(end, 1500);
+      frame.src = "about:blank";
+    });
+  }
+  /* phones and tablets (the touch-screen query site.css uses), where the full map makes the page lag */
+  const phone = matchMedia("(hover: none) and (pointer: coarse)").matches;
+  /* a phone runs one 3D map at a time (each is a full WebGL page; two can make iPhone Safari reload the tab):
+     whoever loads one says so, and the other lets its frame go */
+  const claim = who => dispatchEvent(new CustomEvent("welloby:map3d-claim", { detail: who }));
+  window.wellobyMap3d = { url: base, fallback: M.fallback || base, origin, embeddable, connect, hashFor, check, claim, single: phone, blank };
 
   const root = document.querySelector("[data-mapx]");
   if (!root) return;
   const SPAWN = W.spawn || { min: 100, max: 1000 };
-  /* phones and tablets (the touch-screen query site.css uses), where the full map makes the page lag */
-  const phone = matchMedia("(hover: none) and (pointer: coarse)").matches;
-  /* BlueMap only loads the detailed tiles (about 26 MB around spawn) once the camera is under 1,000 blocks
+  /* The 3D map only loads the detailed tiles (about 26 MB around spawn) once the camera is under 1,000 blocks
      away, so phones start the Overworld above that, on the light low-detail model, until they zoom in */
   const WORLDS = {
     world: { name: "Overworld", distance: phone ? 1200 : 420, angle: .8 },
     world_the_nether: { name: "Nether", distance: 260, angle: .75 },
     world_the_end: { name: "End", distance: 220, angle: .7 }
   };
+  const saveData = !!(navigator.connection && navigator.connection.saveData);
   const START = { map: "world", x: 0, z: 0, distance: WORLDS.world.distance, rotation: .6, angle: WORLDS.world.angle, mode: "perspective" };
   const frame = root.querySelector("[data-mapx-frame]"), gate = root.querySelector("[data-mapx-gate]");
   const note = root.querySelector("[data-mapx-note]"), loadBtn = root.querySelector("[data-mapx-load]");
-  let client = null, loaded = false, world = "world", mode = "perspective";
+  let client = null, loaded = false, world = "world", mode = "perspective", missed = false, blanking = Promise.resolve();
 
   const say = t => { if (note) note.textContent = t || ""; };
   function paint() {
@@ -91,8 +116,9 @@
   function load(view) {
     if (!embeddable || !frame) return false;
     if (loaded) return true;
-    loaded = true;
+    loaded = true; missed = false;
     root.dataset.state = "loading";
+    if (phone) claim("main");
     client = connect(frame, ev => {
       if (ev.wl === "ready") root.dataset.state = "live";
       if (ev.wl === "camera" || ev.wl === "ready") {
@@ -101,12 +127,36 @@
         paint();
       }
     });
-    frame.addEventListener("load", () => { if (root.dataset.state === "loading") root.dataset.state = "live"; }, { once: true });
-    check().then(ok => {
-      if (ok) frame.src = base + hashFor(view || START);
-      else { root.dataset.state = "poster"; say(""); }      // the poster opens the map in its own tab instead
+    Promise.all([check(), blanking]).then(([ok]) => {
+      if (!loaded) return;                                   // let go of in the meantime
+      if (ok) {
+        frame.addEventListener("load", () => { if (root.dataset.state === "loading") root.dataset.state = "live"; }, { once: true });
+        frame.src = base + hashFor(view || START);
+      }
+      else { root.dataset.state = "poster"; missed = true; offerRetry(); say(""); }   // the poster opens the map in its own tab instead
     });
     return true;
+  }
+  /* let the frame go: before trying again, or on a phone when Spawn Guessr loads its own map */
+  function unload() {
+    if (!loaded) return;
+    if (client && client.close) client.close();
+    client = null; loaded = false;
+    if (frame.src) blanking = blank(frame);
+    root.dataset.live = "0";
+    root.dataset.state = phone || saveData ? "ask" : "idle";
+  }
+  addEventListener("welloby:map3d-claim", e => { if (phone && e.detail !== "main") unload(); });
+  /* the poster after a failed check gets a Try again (build.py's poster only has the open-in-a-tab link),
+     and the map is checked again by itself when the section comes back into view */
+  function retry() { if (!missed) return; unload(); missed = false; load(); }
+  function offerRetry() {
+    const cta = root.querySelector(".mapx-poster-cta");
+    if (!cta || cta.querySelector("[data-mapx-retry]")) return;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "btn btn-line"; b.setAttribute("data-mapx-retry", ""); b.textContent = "Try again";
+    b.addEventListener("click", retry);
+    cta.append(b);
   }
   function view(v, fly) {
     if (!load(v)) return;
@@ -138,7 +188,6 @@
 
   /* load when the section comes close, unless the browser asked to save data, or on a phone, where downloading
      and drawing the map lags the page: there it waits for a tap (Load, the map's buttons, a coordinate link) */
-  const saveData = !!(navigator.connection && navigator.connection.saveData);
   if (!embeddable) root.dataset.state = "poster";
   else if (saveData || phone) {
     root.dataset.state = "ask";
@@ -148,7 +197,10 @@
 
   /* the gate keeps page scrolling from turning into map zooming until someone clicks in */
   if (gate) gate.addEventListener("click", () => { load(); root.dataset.live = "1"; setTimeout(() => { try { frame.focus(); } catch (e) { /* ignore */ } }, 50); });
-  new IntersectionObserver(es => { if (es.some(e => !e.isIntersecting)) root.dataset.live = "0"; }, { threshold: 0 }).observe(root);
+  new IntersectionObserver(es => {
+    if (es.some(e => !e.isIntersecting)) root.dataset.live = "0";
+    else if (missed) check().then(up => { if (up) retry(); });
+  }, { threshold: 0 }).observe(root);
 
   root.addEventListener("click", e => {
     const w = e.target.closest("[data-mapx-world]"), m = e.target.closest("[data-mapx-mode]"), act = e.target.closest("[data-mapx-act]");

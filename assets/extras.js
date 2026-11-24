@@ -1,4 +1,4 @@
-/* Welloby extras: map age, travel planner, contact helper, donations, invite and share. */
+/* Welloby extras: the travel planner, donations, videos that load on press, invite and share. */
 (() => {
   "use strict";
   const W = window.WELLOBY || {};
@@ -7,7 +7,7 @@
   const toast = t => window.dispatchEvent(new CustomEvent("welloby:toast", { detail: t }));
   const fmt = n => Math.round(n).toLocaleString("en-US");
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const server = W.server || {}, links = W.links || {}, donate = W.donate || {};
+  const server = W.server || {}, donate = W.donate || {};
   const SITE = (W.siteUrl || "https://welloby.com/").replace(/\/$/, "");
   async function copy(text, what) {
     let ok = false;
@@ -21,19 +21,6 @@
     }
     toast(ok ? "Copied " + what : "Couldn't copy here. Select the text and copy it yourself.");
     return ok;
-  }
-
-  /* ---------- map age ---------- */
-  const age = $("[data-map-age]");
-  if (age && W.mapStart) {
-    const start = Date.parse(W.mapStart + "T00:00:00Z");
-    const paint = () => {
-      const d = Math.floor((Date.now() - start) / 864e5);
-      if (!(d >= 0)) return;
-      age.textContent = fmt(d) + " days";
-      age.title = "No resets since " + new Date(start).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
-    };
-    paint(); setInterval(paint, 60000);
   }
 
   /* ---------- travel planner ---------- */
@@ -106,55 +93,12 @@
     };
   }
 
-  /* ---------- contact helper ---------- */
-  const reach = $("[data-reach]");
-  if (reach) {
-    const admin = (W.contact && W.contact.adminDiscord) || "WELLOBY";
-    const TOPICS = {
-      question: { head: "Question", where: "Ask in <b>#general</b> on Discord. Most answers are faster from kevzy, the help bot on this page.", label: "Your question", ask: true },
-      report: { head: "Report", where: "Post it in <b>#reports</b> on Discord, with a clip if you have one. Hacked clients are allowed, so hacking itself is not something to report.", label: "What happened, where (x, z) and when" },
-      appeal: { head: "Ban appeal", where: "One message in <b>#ban-appeals</b> on Discord. Say what happened and keep it short.", label: "What happened" },
-      bug: { head: "Bug or idea", where: "Post it in <b>#general</b> on Discord. If it breaks the server, use <b>#reports</b>.", label: "What you found, or what you'd like" },
-      business: { head: "Videos and partnerships", where: "Send a direct message to <b>" + esc(admin) + "</b> on Discord.", label: "Who you are and what you have in mind" }
-    };
-    let topic = "question";
-    const whereEl = $("[data-reach-where]", reach), nameIn = $("[data-reach-name]", reach), textIn = $("[data-reach-text]", reach);
-    const textLabel = $("[data-reach-text-label]", reach), copyBtn = $("[data-reach-copy]", reach);
-    const open = $("[data-reach-open]", reach);
-    if (links.discord) open.href = links.discord;
-    function compose() {
-      const t = TOPICS[topic], name = nameIn.value.trim(), body = textIn.value.trim();
-      const lines = [t.head, "In-game name: " + (name || "?")];
-      if (body) lines.push(body);
-      return lines.join("\n");
-    }
-    function paint() {
-      const t = TOPICS[topic];
-      $$("[data-topic]", reach).forEach(b => b.setAttribute("aria-pressed", String(b.dataset.topic === topic)));
-      whereEl.innerHTML = t.where + (t.ask ? ' <button type="button" class="ask-link" data-ask="what can you do">Ask kevzy</button>' : "");
-      textLabel.textContent = t.label;
-      copyBtn.dataset.copy = compose();
-    }
-    $$("[data-topic]", reach).forEach(b => b.addEventListener("click", () => { topic = b.dataset.topic; paint(); }));
-    nameIn.addEventListener("input", () => { copyBtn.dataset.copy = compose(); });
-    textIn.addEventListener("input", () => { copyBtn.dataset.copy = compose(); });
-    paint();
-  }
-
   /* ---------- donations ---------- */
   const jar = $("[data-tipjar]");
   if (jar) {
-    const acts = $("[data-tip-acts]", jar), kofi = $('[data-tip="kofi"]', jar);
+    /* the buttons are in the page: build.py writes them from config.json, Buy Me a Coffee only once donate.bmcOn is set (F52) */
+    const kofi = $('[data-tip="kofi"]', jar);
     if (donate.kofi && kofi) kofi.href = donate.kofi;
-    const extra = [];
-    if (donate.bmc) extra.push(['<svg class="i"><use href="#i-heart"/></svg>Buy Me a Coffee', donate.bmc, "bmc"]);
-    if (donate.paypal) extra.push(["PayPal", donate.paypal, "paypal"]);
-    extra.forEach(x => {
-      const a = document.createElement("a");
-      a.className = "btn btn-line btn-l"; a.href = x[1]; a.target = "_blank"; a.rel = "noopener"; a.dataset.tip = x[2];
-      a.innerHTML = x[0] + '<svg class="i"><use href="#i-ext"/></svg>';
-      acts.append(a);
-    });
     const goalEl = $("[data-goal]", jar), fill = $("[data-goal-fill]", jar), bar = $("[data-goal-bar]", jar);
     const totalEl = $("[data-goal-total]", jar), ofEl = $("[data-goal-of]", jar), staticEl = $("[data-goal-static]", jar);
     const sup = $("[data-supporters]", jar), supList = $("[data-supporters-list]", jar);
@@ -173,7 +117,8 @@
         if (!r.ok) throw new Error("state");
         const d = await r.json();
         const goal = Number(d.goal) || Number(donate.goal) || 0, total = Math.max(0, Number(d.total) || 0);
-        if (goal > 0) {
+        /* the bar only once someone has given this month; until then the sentence with the goal shows */
+        if (goal > 0 && total > 0) {
           const pct = Math.min(100, total / goal * 100);
           totalEl.textContent = money(total);
           ofEl.textContent = "of " + money(goal) + " this month" + (d.count ? ", from " + fmt(d.count) + " supporter" + (d.count === 1 ? "" : "s") : "");
@@ -217,17 +162,17 @@
   /* ---------- invite and share ---------- */
   const java = (server.java && server.java.host) || "mc.welloby.com";
   const bed = server.bedrock || {};
-  const invite = "come play on welloby, a minecraft anarchy server. one map, no resets.\n" +
-    "java: " + java + " (1.7.2 to 26.3)\n" +
-    (bed.host ? "bedrock: " + bed.host + " port " + bed.port + "\n" : "") +
-    "first join you set a password, then you spawn somewhere random and type /accept to accept the rules.\n" + SITE;
+  const invite = "Come play on Welloby, a free Minecraft anarchy server. One map, no resets.\n" +
+    "Java: " + java + " (versions 1.7.2 to 26.3)\n" +
+    (bed.host ? "Bedrock: " + bed.host + ", port " + bed.port + "\n" : "") +
+    "The first time you join, you make a password. Then you type /accept to agree to the Terms.\n" + SITE;
   $$("[data-invite]").forEach(b => b.addEventListener("click", () => copy(invite, "an invite. Paste it to your friend.")));
   $$("[data-share]").forEach(b => b.addEventListener("click", async () => {
-    const data = { title: "Welloby Anarchy", text: "A Minecraft anarchy server with one map that never resets. " + java, url: SITE + "/" };
+    const data = { title: "Welloby Anarchy", text: "A free Minecraft anarchy server with one map that never resets. " + java, url: SITE + "/" };
     if (navigator.share) {
       try { await navigator.share(data); return; }
       catch (e) { if (e && e.name === "AbortError") return; }
     }
-    copy(data.url, "the link to the site");
+    copy(data.url, "the link to this site. Paste it anywhere.");
   }));
 })();

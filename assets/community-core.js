@@ -7,8 +7,13 @@
   const W = window.WELLOBY || {};
   const CFG = W.community || {};
   const API = String(CFG.api || "/api").replace(/\/+$/, "");
-  const ON_HUB = /community(\.html)?\/?$/.test(location.pathname) || document.body.classList.contains("cm-page");
-  const HUB = ON_HUB ? "" : "community.html";
+  /* Two pages run the app: community.html (data-app="community") and the server list, servers.html (data-app="servers",
+     which starts on #/servers). Both are ON_HUB: account pages open right there. Profiles, messages, clans and
+     settings live on the community page, so every other page, the server list included, links to them there. */
+  const APP = (document.body.dataset && document.body.dataset.app) || "";
+  const START = (document.body.dataset && document.body.dataset.start) || "/";
+  const ON_HUB = document.body.classList.contains("cm-page");
+  const HUB = APP === "community" ? "" : "community.html";
   const KEY = "welloby.session";
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
@@ -21,11 +26,21 @@
   const money = (n, cur) => (cur && cur !== "USD" ? cur + " " : "$") + (Math.round(n * 100) % 100 ? Number(n).toFixed(2) : fmt(n));
 
   /* ---------- API and session ---------- */
-  class ApiError extends Error { constructor(msg, status, code) { super(msg); this.status = status; this.code = code; } }
+  /* data: the whole answer, for the extra fields some errors carry (where to appeal a ban, which clans you asked) */
+  class ApiError extends Error { constructor(msg, status, code, data) { super(msg); this.status = status; this.code = code; this.data = data || {}; } }
   let token = store.get(KEY);
   let me = null, health = null;
   const subs = new Set();
   const emit = () => subs.forEach(fn => { try { fn(me); } catch (e) { console.error(e); } });
+  const toast = t => dispatchEvent(new CustomEvent("welloby:toast", { detail: t }));
+  /* a session that ended somewhere else (a new password, "Sign out everywhere", a ban): say so once instead of just
+     redrawing the page as signed out */
+  let endedSaid = false;
+  function sessionEnded() {
+    if (!token) return;
+    setSession(null, null);
+    if (!endedSaid) { endedSaid = true; toast("You were signed out. Sign in again to go on."); }
+  }
 
   async function api(path, opts = {}) {
     const headers = { accept: "application/json" };
@@ -37,13 +52,13 @@
       res = await fetch(API + path, { method: opts.method || (hasBody ? "POST" : "GET"), headers, body: hasBody ? JSON.stringify(opts.body) : undefined, cache: "no-store", credentials: "omit", signal: opts.signal });
     } catch (e) {
       if (e && e.name === "AbortError") throw e;
-      throw new ApiError("Can't reach the board right now. Check your connection and try again.", 0, "offline");
+      throw new ApiError("Can't reach the community right now. Check your connection and try again.", 0, "offline");
     }
     let data = null;
     try { data = await res.json(); } catch (e) { data = null; }
     if (!res.ok) {
-      if (res.status === 401 && data && data.code === "auth" && token) setSession(null, null);
-      throw new ApiError((data && data.error) || "Something went wrong. Try again.", res.status, data && data.code);
+      if (res.status === 401 && data && (data.code === "ended" || data.code === "auth") && token) sessionEnded();
+      throw new ApiError((data && data.error) || "Something went wrong. Try again.", res.status, data && data.code, data);
     }
     return data || {};
   }
@@ -51,14 +66,45 @@
     token = t || null;
     store.set(KEY, token);
     me = token ? user || me : null;
+    if (token) endedSaid = false;
     emit();
+    pollCounts();
   }
   async function refreshMe() {
     if (!token) { me = null; emit(); return null; }
-    try { const d = await api("/me"); me = d.user || null; if (!me) setSession(null, null); else emit(); }
+    try { const d = await api("/me"); me = d.user || null; if (!me) sessionEnded(); else emit(); }
     catch (e) { if (e.status === 401) setSession(null, null); }
     return me;
   }
+
+  /* ---------- what is waiting: invites, clan news, replies, join requests, reports ----------
+     /me brings the counts with the account; between page loads /chats/unread brings them again every 45 seconds and
+     when the tab comes back into view, so the dots move by themselves. */
+  const COUNTS = ["unreadChats", "waiting", "invites", "notices", "replies", "clanRequests", "allyAsks", "reports", "serverReports", "chatReports"];
+  function setCounts(r) {
+    if (!me || !r || typeof r !== "object") return;
+    let changed = false;
+    for (const k of COUNTS) {
+      const v = k === "unreadChats" ? r.unread : r[k];
+      if (typeof v === "number" && me[k] !== v) { me[k] = v; changed = true; }
+    }
+    if (!changed) return;
+    renderAccount();
+    dispatchEvent(new CustomEvent("welloby:counts", { detail: counts() }));
+  }
+  const counts = () => { const o = {}; for (const k of COUNTS) o[k] = me && typeof me[k] === "number" ? me[k] : 0; return o; };
+  let countsAt = 0, countsTimer = 0;
+  async function refreshCounts() {
+    if (!token || !me || !health) return;
+    countsAt = Date.now();
+    try { setCounts(await api("/chats/unread")); } catch (e) { /* the next round tries again */ }
+  }
+  function pollCounts() {
+    clearTimeout(countsTimer);
+    if (!token) return;
+    countsTimer = setTimeout(() => { if (!document.hidden) refreshCounts(); pollCounts(); }, 45000);
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - countsAt > 10000) refreshCounts(); });
   async function signOut(everywhere) {
     const endpoint = await pushDrop();   // this browser stops getting the account's notifications; the API is told which address to forget
     try { await api(everywhere ? "/auth/logout-all" : "/auth/logout", { method: "POST", body: endpoint ? { endpoint } : {} }); } catch (e) { /* signed out locally anyway */ }
@@ -72,7 +118,7 @@
       const d = r.ok ? await r.json() : null;
       health = d && d.ok === true ? d : null;
     } catch (e) { health = null; }
-    if (health) await refreshMe();
+    if (health) { await refreshMe(); pollCounts(); }
     window.wellobyCommunity = { online: !!health, api: API };
     dispatchEvent(new CustomEvent("welloby:community", { detail: { online: !!health } }));
     emit();
@@ -217,7 +263,8 @@
     const up = x.crumb || x.chat || "";
     return /^#\//.test(up) && up !== x.hash ? up : "#/";
   }
-  const appStart = () => ON_HUB && /^(#\/?)?$/.test(location.hash);
+  // the app opens on the community start (site.webmanifest); the server list's start page is not it, so Back shows there
+  const appStart = () => APP === "community" && /^(#\/?)?$/.test(location.hash);
   let backTimer = 0;
   function appBack() {
     const before = location.href;
@@ -237,7 +284,7 @@
     btn.className = "app-back";
     btn.innerHTML = '<svg class="i" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8H3m4.5-4.5L3 8l4.5 4.5"/></svg><span>Back</span>';
     btn.addEventListener("click", appBack);
-    const brand = $(".bar-brand", bar);
+    const brand = $(".bar-brand, .bar-row .logo", bar);
     if (brand) brand.before(btn); else bar.prepend(btn);
     const paint = () => bar.classList.toggle("has-back", !appStart());
     paint();
@@ -245,7 +292,6 @@
     addEventListener("pagehide", () => clearTimeout(backTimer));   // a page kept for going back to must not move by itself when it comes back
   }
   mountBack();
-
 
   /* ---------- seeded randomness ---------- */
   function hash32(s) {
@@ -476,23 +522,58 @@
   }
 
   /* ---------- the account chip in the top bar ---------- */
+  /* "add" while the account has no email, "confirm" while it isn't confirmed (a confirmed recovery email counts), else "".
+     Older answers without the email field say nothing. */
+  function mailTodo(u) {
+    const a = u && u.account;
+    if (!a || typeof a.email !== "string") return "";
+    if (a.emailVerified || (a.recovery && a.recoveryVerified)) return "";
+    return a.email ? "confirm" : "add";
+  }
+  /* Sign in and Create account: on the two app pages they open right there and carry the page the visitor is on, so
+     signing in comes back to the thread or the list (not from an account page itself); elsewhere they open the
+     community page. Kept while the community service is down too, so Sign in never leaves the first screen. */
+  function visitorLinks() {
+    if (!ON_HUB) return [`${HUB}#/login`, `${HUB}#/register`];
+    const here = location.hash && location.hash !== "#" ? location.hash : "#" + START;
+    // on an account page itself, keep where that page was going to send them (Sign in <-> Create account keeps it)
+    const own = /^#\/(login|register|auth|forgot|reset|verify|undo-email|welcome)\b/.test(here) ? /[?&]next=([^&]*)/.exec(here) : null;
+    const back = own ? "?next=" + own[1] : here === "#/" || /^#\/(login|register|auth|forgot|reset|verify|undo-email|welcome)\b/.test(here) ? "" : "?next=" + encodeURIComponent(here);
+    return ["#/login" + back, "#/register" + back];
+  }
   function renderAccount() {
-    for (const slot of $$("[data-account]")) {
-      if (!health) { slot.innerHTML = ""; continue; }
+    const [signIn, join] = visitorLinks();
+    const c = counts(), mail = me ? mailTodo(me) : "", unread = c.unreadChats, many = n => (n > 99 ? "99+" : n);
+    // the phone menu's account block: the same two links for visitors, the member's own pages for members
+    for (const box of $$("[data-account-menu]")) {
       if (!me) {
-        slot.innerHTML = ON_HUB
-          ? '<a class="acct-in" href="#/login">Sign in</a><a class="btn btn-lava btn-s acct-join" href="#/register">Join</a>'
-          : `<a class="acct-in" href="${HUB}#/login">Sign in</a>`;
+        box.innerHTML = `<a class="btn-out" href="${signIn}">Sign in</a><a class="btn-out" href="${join}">Create account</a>`;
+        box.removeAttribute("data-member");
         continue;
       }
-      const alerts = (me.clanRequests || 0) + (me.reports || 0), unread = me.unreadChats || 0, many = n => (n > 99 ? "99+" : n);
-      slot.innerHTML = `<a class="acct-msg" href="${HUB}#/messages" title="Messages" aria-label="Messages${unread ? ", " + unread + " unread" : ""}"><svg class="i" aria-hidden="true"><use href="#i-chat"/></svg>${unread ? `<i class="acct-dot">${many(unread)}</i>` : ""}</a><details class="acct">
-        <summary aria-label="Your account, ${esc(me.name)}${alerts ? ", " + alerts + " waiting" : ""}">${head(me, 26)}<span class="acct-name">${esc(me.name)}</span>${alerts ? `<i class="acct-dot">${alerts}</i>` : ""}</summary>
+      box.innerHTML = `<a class="btn-out" href="${userHref(me)}">Your profile</a><a class="btn-out" href="${HUB}#/inbox">Invites and replies${c.waiting ? ` <i class="acct-dot">${many(c.waiting)}</i>` : ""}</a>`
+        + `<a class="btn-out" href="${HUB}#/messages">Messages${unread ? ` <i class="acct-dot">${many(unread)}</i>` : ""}</a>`
+        + `<a class="btn-out" href="${HUB}#/settings${mail ? "?p=email" : ""}">Settings${mail ? ' <i class="acct-dot" aria-label="your email needs you">!</i>' : ""}</a>`
+        + '<button type="button" class="btn-out" data-signout>Sign out</button>';
+      box.setAttribute("data-member", "1");
+    }
+    if (document.documentElement) document.documentElement.classList.remove("acct-wait");
+    for (const slot of $$("[data-account]")) {
+      if (!me) {
+        slot.innerHTML = `<a class="acct-in" href="${signIn}">Sign in</a><a class="btn-out acct-join" href="${join}">Create account</a>`;
+        continue;
+      }
+      // waiting: invites, clan news, replies to your threads, join requests and alliance asks (the inbox); reports for staff;
+      // and one for an email that still needs adding or confirming
+      const alerts = c.waiting + c.reports + (mail ? 1 : 0);
+      slot.innerHTML = `<a class="acct-msg" href="${HUB}#/messages" title="Messages" aria-label="Messages${unread ? ", " + unread + " unread" : ""}"><svg class="i" aria-hidden="true"><use href="#i-chat"/></svg><span class="acct-msg-word" aria-hidden="true">Messages</span>${unread ? `<i class="acct-dot">${many(unread)}</i>` : ""}</a><details class="acct">
+        <summary aria-label="Your account, ${esc(me.name)}${alerts ? ", " + alerts + " waiting" : ""}">${head(me, 26)}<span class="acct-name">${esc(me.name)}</span>${alerts ? `<i class="acct-dot">${many(alerts)}</i>` : ""}</summary>
         <div class="acct-menu">
           <a href="${userHref(me)}">Your profile</a>
+          <a href="${HUB}#/inbox">Invites and replies${c.waiting ? ` <i class="acct-dot">${many(c.waiting)}</i>` : ""}</a>
           <a href="${HUB}#/messages">Messages${unread ? ` <i class="acct-dot">${many(unread)}</i>` : ""}</a>
-          ${me.clan ? `<a href="${clanHref(me.clan)}">${esc(me.clan.name)}${me.clanRequests ? ` <i class="acct-dot">${me.clanRequests}</i>` : ""}</a>` : `<a href="${HUB}#/clans">Find a clan</a>`}
-          <a href="${HUB}#/settings">Settings</a>
+          ${me.clan ? `<a href="${clanHref(me.clan)}">${esc(me.clan.name)}${c.clanRequests ? ` <i class="acct-dot">${many(c.clanRequests)}</i>` : ""}</a>` : `<a href="${HUB}#/clans">Find a clan</a>`}
+          <a href="${HUB}#/settings${mail ? "?p=email" : ""}">Settings${mail ? ' <i class="acct-dot" aria-label="your email needs you">!</i>' : ""}</a>
           ${me.role !== "player" ? `<a href="${HUB}#/admin">Staff desk${me.reports ? ` <i class="acct-dot">${me.reports}</i>` : ""}</a>` : ""}
           <button type="button" data-signout>Sign out</button>
         </div></details>`;
@@ -500,7 +581,12 @@
   }
   document.addEventListener("click", e => {
     const out = e.target.closest("[data-signout]");
-    if (out) { e.preventDefault(); signOut(false).then(() => dispatchEvent(new CustomEvent("welloby:toast", { detail: "Signed out" }))); }
+    if (out) {
+      e.preventDefault();
+      const menu = out.closest("details.menu");   // Sign out in the phone menu closes it, like its links do
+      if (menu) menu.removeAttribute("open");
+      signOut(false).then(() => dispatchEvent(new CustomEvent("welloby:toast", { detail: "Signed out" })));
+    }
     for (const d of $$("details.acct[open]")) if (!d.contains(e.target) || e.target.closest(".acct-menu a")) d.removeAttribute("open");
   });
   document.addEventListener("keydown", e => {
@@ -508,19 +594,33 @@
     for (const d of $$("details.acct[open]")) { d.removeAttribute("open"); $("summary", d).focus(); }
   });
   subs.add(renderAccount);
+  // a visitor's Sign in follows the page they move to, so it comes back there
+  // the phone menu closes when the page moves on (Back, or a script going to another page), not only on its own links
+  if (ON_HUB) addEventListener("hashchange", () => {
+    if (!me) renderAccount();
+    for (const m of $$("details.menu[open]")) m.removeAttribute("open");
+  });
   /* the community page keeps the messages count fresh without fetching the whole account again */
-  function setUnread(n) {
-    if (!me || typeof n !== "number" || me.unreadChats === n) return;
-    me.unreadChats = n;
-    renderAccount();
-  }
+  function setUnread(n) { setCounts({ unread: n }); }
 
-  /* ---------- terms: every signed-in member accepts the current terms once per browser ---------- */
+  /* ---------- terms: every member accepts the current terms once, on the account ----------
+     The account keeps the version it accepted (account.terms), so signing in on a new phone doesn't ask again. This
+     browser keeps it too, for visitors and for an API from before accounts kept it. */
   const TERMS = { version: "2026-11-20", label: "20 November 2026", key: "welloby.terms", url: "terms.html" };
   const termsAccepted = () => store.get(TERMS.key) === TERMS.version;
-  const acceptTerms = () => store.set(TERMS.key, TERMS.version);
+  const termsSaved = u => !!u && !!u.account && u.account.terms === TERMS.version;
+  function acceptTerms() {
+    store.set(TERMS.key, TERMS.version);
+    if (me && me.account && typeof me.account.terms === "string" && me.account.terms !== TERMS.version) {
+      me.account.terms = TERMS.version;
+      api("/me", { method: "PATCH", body: { terms: TERMS.version } }).catch(() => { me && me.account && (me.account.terms = ""); });
+    }
+  }
+  let termsLater = false;
   function termsGate(u) {
-    if (!u || termsAccepted() || /\/terms(\.html)?$/.test(location.pathname) || $("[data-terms-gate]")) return;
+    if (!u || termsLater || /\/terms(\.html)?$/.test(location.pathname) || $("[data-terms-gate]")) return;
+    if (termsSaved(u)) { store.set(TERMS.key, TERMS.version); return; }
+    if (termsAccepted()) { acceptTerms(); return; }   // accepted in this browser before the account kept it: the account learns it now
     const d = document.createElement("dialog");
     if (typeof d.showModal !== "function") return;
     d.className = "terms-gate notch";
@@ -534,10 +634,11 @@
         <button class="btn btn-lava" value="accept">I agree</button>
         <button class="btn btn-line" value="signout">Sign out instead</button>
       </form>`;
-    /* closing it any way other than "I agree" (Esc included) counts as declining and signs you out */
+    /* only "Sign out instead" signs out; Esc or the phone's back button is "not now", and it asks again on the next page load */
     d.addEventListener("close", () => {
       if (d.returnValue === "accept") acceptTerms();
-      else signOut(false);
+      else if (d.returnValue === "signout") signOut(false);
+      else termsLater = true;
       d.remove();
     });
     document.body.append(d);
@@ -547,18 +648,39 @@
   /* Visitors who aren't signed in get a small notice instead, which doesn't stop them browsing
      (asked for in the advertising session, 20 Nov 2026). Its OK is the same acceptance on this
      device as a member's "I agree"; members keep the dialog above. */
+  /* The notice is the slim strip at the bottom that every page carries (build.py puts it first after "Skip to content",
+     so OK is an early keyboard stop); a page without one gets it added. While it is up the page gets its measured
+     height as room at the bottom (--strip-h), so it never sits on the last buttons, and Help floats above it.
+     html.terms-ok hides it for good once this browser accepted or a member is signed in. */
+  const termsRoom = on => {
+    try {
+      document.body.classList.toggle("has-terms-bar", on);
+      if (document.documentElement) document.documentElement.classList.toggle("terms-ok", !on);
+    } catch (e) { /* no page body */ }
+  };
+  function stripHeight(bar) {
+    const put = () => { const h = bar.offsetHeight; if (h && document.documentElement) document.documentElement.style.setProperty("--strip-h", h + "px"); };
+    put();
+    if (typeof ResizeObserver === "function") new ResizeObserver(put).observe(bar);
+  }
+  const wired = new WeakSet();
   function termsBar() {
-    const old = $("[data-terms-bar]");
-    if (me || termsAccepted() || /\/terms(\.html)?$/.test(location.pathname)) { if (old) old.remove(); return; }
-    if (old) return;
-    const bar = document.createElement("div");
-    bar.className = "terms-bar notch";
-    bar.setAttribute("data-terms-bar", "");
-    bar.setAttribute("role", "region");
-    bar.setAttribute("aria-label", "Terms of use");
-    bar.innerHTML = `<p>By using this site, playing on Welloby or joining its Discord, you accept the <a href="${TERMS.url}">Terms</a>.</p><button type="button" class="btn btn-lava btn-s" data-terms-ok>OK</button>`;
-    bar.querySelector("[data-terms-ok]").addEventListener("click", () => { acceptTerms(); bar.remove(); });
-    document.body.append(bar);
+    let bar = $("[data-terms-bar]");
+    if (me || termsAccepted() || /\/terms(\.html)?$/.test(location.pathname)) { if (bar) bar.remove(); termsRoom(false); return; }
+    if (bar && wired.has(bar)) return;
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.className = "terms-strip";
+      bar.setAttribute("data-terms-bar", "");
+      bar.setAttribute("role", "region");
+      bar.setAttribute("aria-label", "Terms of use");
+      bar.innerHTML = `<p>By using this site, playing on Welloby or joining its Discord, you accept the <a href="${TERMS.url}">Terms</a>.</p><button type="button" class="btn-out" data-terms-ok>OK</button>`;
+      document.body.append(bar);
+    }
+    wired.add(bar);
+    termsRoom(true);
+    bar.querySelector("[data-terms-ok]").addEventListener("click", () => { acceptTerms(); bar.remove(); termsRoom(false); });
+    stripHeight(bar);
   }
   subs.add(termsBar);
   if (!token) termsBar();   // no saved session at all: show it straight away
@@ -584,10 +706,10 @@
       .map(([k, label]) => `<div><b>${fmt(st[k])}</b><span>${label}</span></div>`).join("");
     $("[data-cm-clans]", teaser).innerHTML = (d.clans || []).slice(0, 5).map((c, i) =>
       `<li><a href="${clanHref(c)}"><i class="rk">${i + 1}</i>${banner(c.banner, "bnr-xs")}<span><b>${esc(c.name)}</b><small>[${esc(c.tag)}] \u00b7 ${plural(c.members, "member")}</small></span></a></li>`).join("")
-      || `<li class="cmt-empty">No clans yet. <a href="${HUB}#/clans/new">Found the first one.</a></li>`;
+      || `<li class="cmt-empty">No clans yet. <a href="${HUB}#/clans/new">Make the first one.</a></li>`;
     $("[data-cm-threads]", teaser).innerHTML = (d.threads || []).slice(0, 5).map(t =>
       `<li><a href="${HUB}#/t/${t.id}"><b>${esc(t.title)}</b><small>${t.user && !t.user.deleted ? esc(t.user.name) : "Deleted player"} \u00b7 ${plural(t.replies, "reply", "replies")} \u00b7 ${ago(t.lastAt)}</small></a></li>`).join("")
-      || `<li class="cmt-empty">The board is quiet. <a href="${HUB}#/new">Start the first thread.</a></li>`;
+      || `<li class="cmt-empty">The forum is quiet. <a href="${HUB}#/new">Start the first thread.</a></li>`;
     $("[data-cm-players]", teaser).innerHTML = (d.players || []).slice(0, 12).map(u =>
       `<li><a href="${userHref(u)}" title="${esc(u.name)}">${head(u, 44)}<span>${esc(u.name)}</span></a></li>`).join("");
     const join = $("[data-cm-join]", teaser);
@@ -605,7 +727,7 @@
   for (const el of $$("[data-head-name]")) el.innerHTML = head({ name: el.dataset.headName }, 56);
 
   window.WC = {
-    API, HUB, ON_HUB, api, ApiError, ready, refreshMe, signOut, setSession, setUnread,
+    API, HUB, ON_HUB, api, ApiError, ready, refreshMe, signOut, setSession, setUnread, counts, setCounts, refreshCounts, mailTodo,
     me: () => me, health: () => health, onAuth: fn => { subs.add(fn); return () => subs.delete(fn); },
     esc, fmt, money, ago, when, plural, format, plain,
     head, headURL, banner, bannerURL, parseBanner, bannerSpec, randomBanner, COLORS, PATTERNS, PATTERN_NAMES, REACT,

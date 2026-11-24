@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3D map and mini-games · Welloby</title>
+<meta name="description" content="The live 3D map of the Welloby world around spawn, the Spawn Guessr and Elytra Dive mini-games, and a travel planner for Minecraft distances.">
+<meta name="theme-color" content="#171614">
+<meta name="color-scheme" content="dark">
+<link rel="canonical" href="https://welloby.com/map">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Welloby Anarchy">
+<meta property="og:title" content="The Welloby 3D map and mini-games">
+<meta property="og:description" content="See the world around spawn in live 3D, play Spawn Guessr and Elytra Dive, and plan a trip.">
+<meta property="og:url" content="https://welloby.com/map">
+<meta property="og:image" content="https://welloby.com/media/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@WellobyLLC">
+<link rel="preload" href="fonts/barlow-condensed.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/dm-sans.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="icon" href="media/favicon.ico" sizes="any">
+<link rel="icon" href="media/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="media/apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Welloby">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<script>(function(){var h=document.documentElement,c=" js";try{if(localStorage.getItem("welloby.terms")==="2026-11-20")c+=" terms-ok";if(localStorage.getItem("welloby.session"))c+=" acct-wait"}catch(e){}h.className+=c})()</script>
+<style>
+@font-face{font-family:"Barlow Condensed";src:url(fonts/barlow-condensed.woff2) format("woff2");font-weight:800;font-style:normal;font-display:swap}
+@font-face{font-family:"DM Sans";src:url(fonts/dm-sans.woff2) format("woff2");font-weight:100 1000;font-style:normal;font-display:swap}
+@font-face{font-family:"IBM Plex Mono";src:url(fonts/ibm-plex-mono.woff2) format("woff2");font-weight:500;font-style:normal;font-display:swap}
+</style>
+<link rel="stylesheet" href="assets/site.css?v=cad7a53e79">
+<link rel="stylesheet" href="assets/community.css?v=f18b11a1b9">
+<script defer src="assets/data.js?v=6acc23667d"></script>
+<script defer src="assets/site.js?v=82ba15a883"></script>
+<script defer src="assets/map3d.js?v=3006b2ec2d"></script>
+<script defer src="assets/games.js?v=6cf5073d2b"></script>
+<script defer src="assets/extras.js?v=946425ad02"></script>
+<script defer src="assets/kevzy-kb.js?v=9f86785d94"></script>
+<script defer src="assets/kevzy.js?v=a208b861f7"></script>
+<script defer src="assets/community-core.js?v=8f0af988d2"></script>
+<script defer src="assets/motion.js?v=a33411af49"></script>
+</head>
+<body class="page-welloby page-map">
+<a class="skip" href="#main">Skip to content</a>
+<div class="terms-strip" data-terms-bar role="region" aria-label="Terms of use"><p>By using this site, playing on Welloby or joining its Discord, you accept the <a href="terms.html">Terms</a>.</p><button type="button" class="btn-out" data-terms-ok>OK</button></div>
+
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="8" height="8"/><path d="M10.5 2.5h-8v8"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="m2.5 8.5 3.5 3.5 7.5-8"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 16 16"><path d="M13.5 7a5.5 5.5 0 1 0-.8 3.8M13.5 2.5V7H9"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 16 16"><path d="M6 3H3v10h10v-3M9 3h4v4M13 3 7.5 8.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 2.5v11M2.5 8h11"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 16 16"><path d="M2.5 8h11"/></symbol>
+  <symbol id="i-home" viewBox="0 0 16 16"><rect x="4" y="4" width="8" height="8"/><path d="M8 1v3m0 8v3M1 8h3m8 0h3"/></symbol>
+  <symbol id="i-expand" viewBox="0 0 16 16"><path d="M2 6V2h4m4 0h4v4m0 4v4h-4m-4 0H2v-4"/></symbol>
+  <symbol id="i-shrink" viewBox="0 0 16 16"><path d="M6 2v4H2m12 0h-4V2m0 12v-4h4M2 10h4v4"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 16 16"><path d="M4 2h8v6l-4 6-4-6z"/><rect x="6.5" y="4.5" width="3" height="3"/></symbol>
+  <symbol id="i-ruler" viewBox="0 0 16 16"><path d="m2 11 9-9 3 3-9 9zM5 8l1.5 1.5M7 6l1.5 1.5M9 4l1.5 1.5"/></symbol>
+  <symbol id="i-link" viewBox="0 0 16 16"><path d="M7 9a3 3 0 0 0 4.2 0l2-2A3 3 0 0 0 9 2.8l-.8.8M9 7a3 3 0 0 0-4.2 0l-2 2A3 3 0 0 0 7 13.2l.8-.8"/></symbol>
+  <symbol id="i-dice" viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11"/><path d="M5.5 5.5h.01M10.5 5.5h.01M8 8h.01M5.5 10.5h.01M10.5 10.5h.01" stroke-width="2"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16"><path d="m3.5 3.5 9 9m0-9-9 9"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 16 16"><path d="M2.5 4.5h11M6 4V2.5h4V4m-6 .5.6 9h6.8l.6-9M6.6 7v4m2.8-4v4"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 16 16"><path d="M2 4.5h12M2 8h12M2 11.5h12"/></symbol>
+  <symbol id="i-down" viewBox="0 0 16 16"><path d="M8 2v9m-4-4 4 4 4-4M2.5 13.5h11"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 16 16"><rect x="2" y="2.5" width="12" height="11"/><path d="M10 2.5v11"/></symbol>
+  <symbol id="i-send" viewBox="0 0 16 16"><path d="M2.5 8h10.5M8.5 3.5 13 8l-4.5 4.5"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 16 16"><path d="M8 13.5 2.6 8.1a3.1 3.1 0 0 1 4.4-4.4l1 1 1-1a3.1 3.1 0 0 1 4.4 4.4z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 16 16"><path d="M2.5 3h11v7.5H7l-3 2.5v-2.5H2.5z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 16 16"><path d="M4.5 2.5v11l9-5.5z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 16 16"><path d="M5 3v10m6-10v10"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 16 16"><path d="M4.5 2.5h7v3.5a3.5 3.5 0 0 1-7 0zM4.5 4H2v1.5A2.5 2.5 0 0 0 4.7 8M11.5 4H14v1.5A2.5 2.5 0 0 1 11.3 8M8 9.5v3M5 13.5h6"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 16 16"><rect x="2" y="3.5" width="12" height="9"/><path d="m2 4 6 5 6-5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 16 16"><path d="M8 14V4M3.5 8.5 8 4l4.5 4.5M2.5 2h11"/></symbol>
+  <symbol id="i-share" viewBox="0 0 16 16"><path d="M8 10V2.5M5 5.5l3-3 3 3M3 8.5v5h10v-5"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 16 16"><rect x="3.5" y="7.5" width="9" height="6"/><path d="M5.5 7.5v-2a2.5 2.5 0 0 1 5 0v2"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 16 16"><path d="M3.5 14V2.5M3.5 3h8l-2 3 2 3h-8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 16 16"><rect x="4" y="3" width="4" height="4"/><path d="M2 13.5c.4-2.6 1.8-4 4-4s3.6 1.4 4 4M10.5 3.2a2 2 0 0 1 0 3.6M11.5 9.6c1.4.5 2.2 1.8 2.5 3.9"/></symbol>
+  <symbol id="i-scroll" viewBox="0 0 16 16"><path d="M4 2.5h8v9.5a1.5 1.5 0 0 1-3 0v-1H2.5V12A1.5 1.5 0 0 0 4 13.5h7M6 5.5h4M6 8h4"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 16 16"><path d="M2.5 5.5h10M10 3l2.5 2.5L10 8M13.5 10.5h-10M6 8l-2.5 2.5L6 13"/></symbol>
+  <symbol id="i-help" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12"/><path d="M6.2 6.3a1.9 1.9 0 1 1 2.6 1.8c-.5.2-.8.6-.8 1.1v.6M8 11.4h.01"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 16 16"><path d="m10.5 2.5 3 3-8 8h-3v-3zM9 4l3 3"/></symbol>
+  <symbol id="i-tiktok" viewBox="0 0 16 16"><path d="M9 2v8.6a2.6 2.6 0 1 1-2.6-2.6M9 2c.4 2.1 1.8 3.4 4 3.6"/></symbol>
+  <symbol id="i-instagram" viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="3.2"/><circle cx="8" cy="8" r="2.6"/><path d="M11.3 4.7h.01" stroke-width="2"/></symbol>
+  <symbol id="i-telegram" viewBox="0 0 16 16"><path d="M14 2.6 1.9 7.3l4.4 1.5L12 5 7.7 9.6v3.8l2.2-2.5 3 2.2z"/></symbol>
+  <symbol id="i-youtube" viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="2.6"/><path d="m6.6 6 3.4 2-3.4 2z"/></symbol>
+  <symbol id="i-xlogo" viewBox="0 0 16 16"><path d="M2.5 2.5h3l8 11h-3zM13.5 2.5 8.7 7.8M2.5 13.5l4.8-5.3"/></symbol>
+  <symbol id="i-discord" viewBox="0 0 16 16"><path d="M4.2 4c1.2-.6 2.4-.8 3.8-.8s2.6.2 3.8.8l1.6 6.3c-1 .9-2.2 1.5-3.4 1.8l-.7-1.4M4.2 4 2.6 10.3c1 .9 2.2 1.5 3.4 1.8l.7-1.4"/><path d="M6.1 8.2h.01M9.9 8.2h.01" stroke-width="2"/></symbol>
+  <symbol id="i-go" viewBox="0 0 16 16"><path d="M2.5 8h10.5M8.5 3.5 13 8l-4.5 4.5"/></symbol>
+  <symbol id="i-face" viewBox="0 0 8 8"><rect width="8" height="8" fill="#ff6a1f" stroke="none"/><rect width="8" height="2" fill="#c2371a" stroke="none"/><rect x="1" y="3" width="2" height="2" fill="#f3ecdb" stroke="none"/><rect x="5" y="3" width="2" height="2" fill="#f3ecdb" stroke="none"/><rect x="2" y="4" width="1" height="1" fill="#171614" stroke="none"/><rect x="6" y="4" width="1" height="1" fill="#171614" stroke="none"/><rect x="3" y="6" width="2" height="1" fill="#171614" stroke="none"/></symbol>
+</svg>
+
+<header class="bar" id="top">
+  <div class="frame bar-row">
+    <a class="logo bar-brand" href="index.html" aria-label="Welloby, home"><img class="logo-word" src="media/wordmark.svg" width="134" height="24" alt=""><img class="logo-w" src="media/mark.svg" width="34" height="23" alt=""></a>
+    <nav class="parts parts-top" aria-label="Site"><a href="index.html" aria-current="page">Welloby</a><a href="community.html">Community</a><a href="servers.html">Server list</a></nav>
+    <p class="bar-live"><span class="sr-only">Server status: </span><i class="lamp" data-status-lamp data-state="loading" aria-hidden="true"></i><span data-status-short>Checking</span><span class="players" data-players hidden></span></p>
+    <a class="btn-out bar-dc" href="https://discord.gg/cwHKDtXQWD" target="_blank" rel="noopener"><svg class="i" aria-hidden="true"><use href="#i-discord"/></svg>Discord</a>
+    <span class="bar-acct" data-account><a class="acct-in" href="community.html#/login">Sign in</a><a class="btn-out acct-join" href="community.html#/register">Create account</a></span>
+    <details class="menu" id="menu">
+      <summary class="menu-btn" aria-label="Menu"><svg class="i when-shut" aria-hidden="true"><use href="#i-menu"/></svg><svg class="i when-open" aria-hidden="true"><use href="#i-x"/></svg><span class="when-shut">Menu</span><span class="when-open">Close</span></summary>
+      <div class="menu-sheet"><div class="menu-in">
+        <div class="menu-acct" data-account-menu><a class="btn-out" href="community.html#/login">Sign in</a><a class="btn-out" href="community.html#/register">Create account</a></div>
+        <p class="menu-note">One free account for the Community and the Server list. You do not need one to play.</p>
+        <div class="menu-rows menu-search"><button type="button" class="menu-row" data-cmd-open><svg class="i" aria-hidden="true"><use href="#i-search"/></svg><span>Search this site</span></button></div>
+        <section class="ipcard" aria-label="Welloby server address (IP)">
+          <p class="ipcard-title">Welloby server address (IP)</p>
+          <div class="iprow"><p class="ip-who">Computer (Java Edition)</p><div class="ipfield"><code translate="no">mc.welloby.com</code><button type="button" class="btn-main" data-copy="mc.welloby.com" data-copy-label="mc.welloby.com" data-copy-where="In Minecraft, choose Multiplayer, then Add Server, and paste it into Server Address." aria-label="Copy the Java address, mc.welloby.com"><svg class="i when-idle" aria-hidden="true"><use href="#i-copy"/></svg><svg class="i when-copied" aria-hidden="true"><use href="#i-check"/></svg><span class="when-idle">Copy</span><span class="when-copied">Copied</span></button></div></div>
+          <div class="iprow"><p class="ip-who">Phone, tablet, console, Windows (Bedrock)</p><div class="ipfield"><code translate="no">bedrock.welloby.com</code><button type="button" class="btn-main" data-copy="bedrock.welloby.com" data-copy-label="bedrock.welloby.com" data-copy-where="In Minecraft, choose Play, then Servers, then Add Server, and paste it into Server Address. The port is 25620." aria-label="Copy the Bedrock address, bedrock.welloby.com"><svg class="i when-idle" aria-hidden="true"><use href="#i-copy"/></svg><svg class="i when-copied" aria-hidden="true"><use href="#i-check"/></svg><span class="when-idle">Copy</span><span class="when-copied">Copied</span></button></div><div class="ipfield"><span class="ipfield-k">Port</span><code translate="no">25620</code><button type="button" class="btn-out" data-copy="25620" data-copy-label="the port, 25620" data-copy-where="Paste it into Port, under the server address." aria-label="Copy the Bedrock port, 25620"><svg class="i when-idle" aria-hidden="true"><use href="#i-copy"/></svg><svg class="i when-copied" aria-hidden="true"><use href="#i-check"/></svg><span class="when-idle">Copy port</span><span class="when-copied">Copied</span></button></div></div>
+        </section>
+        <nav class="menu-parts" aria-label="All pages"><div class="menu-part" data-current><h2><a href="index.html" aria-current="page">Welloby</a></h2><ul class="menu-list"><li><a href="index.html#join">How to join</a></li><li><a href="index.html#rules">Rules</a></li><li><a href="index.html#faq">FAQ</a></li><li><a href="#map">Map</a></li><li><a href="index.html#vote">Vote</a></li><li><a href="index.html#donate">Donate</a></li></ul></div><div class="menu-part"><h2><a href="community.html">Community</a></h2><ul class="menu-list"><li><a href="community.html">Overview</a></li><li><a href="community.html#/forum">Forum</a></li><li><a href="community.html#/clans">Clans</a></li><li><a href="community.html#/players">Players</a></li><li><a href="community.html#/messages">Messages</a></li><li><a href="community.html#/supporters">Supporters</a></li></ul></div><div class="menu-part"><h2><a href="servers.html">Server list</a></h2><ul class="menu-list"><li><a href="servers.html">All servers</a></li><li><a href="servers.html#/servers/new">List your server</a></li></ul></div></nav>
+        <div class="menu-rows">
+          <a class="menu-row" href="https://discord.gg/cwHKDtXQWD" target="_blank" rel="noopener"><svg class="i" aria-hidden="true"><use href="#i-discord"/></svg><span>Discord</span><svg class="i menu-row-end" aria-hidden="true"><use href="#i-ext"/></svg></a>
+          <button type="button" class="menu-row" data-ask=""><svg class="i" aria-hidden="true"><use href="#i-help"/></svg><span>Help: ask kevzy, the help bot</span></button>
+        </div>
+        <ul class="menu-more"><li><a href="#games">Mini-games</a></li><li><a href="faq.html#server-info">Server info</a></li><li><a href="#planner">Travel planner</a></li><li><a href="watch.html">Watch and follow</a></li><li><a href="watch.html#brand">Brand kit</a></li><li><a href="terms.html">Terms</a></li><li><a href="privacy.html">Privacy</a></li></ul>
+      </div></div>
+    </details>
+  </div>
+</header>
+<div class="bar-sub"><nav class="parts parts-sub" aria-label="Site"><a href="index.html" aria-current="page">Welloby</a><a href="community.html">Community</a><a href="servers.html">Server list</a></nav><div class="frame acct-row"><span class="acct-slot" data-account><a class="acct-in" href="community.html#/login">Sign in</a><a class="btn-out acct-join" href="community.html#/register">Create account</a></span></div></div>
+<nav class="local local-home" aria-label="Welloby pages"><div class="frame local-row"><div class="bar-nav"><a href="index.html#join">How to join</a><a href="index.html#rules">Rules</a><a href="index.html#faq">FAQ</a><a href="#map">Map</a><a href="index.html#vote">Vote</a><a href="index.html#donate">Donate</a></div></div></nav>
+
+<main id="main">
+
+<!-- the 3D map, the two games and the travel planner, moved here from the home page; the ids map, games and planner
+     are the ones old links (index.html#map, #games, #planner, #map-x120-z-340) are sent on to -->
+<nav class="page-jump wrap" aria-label="On this page"><a class="btn-out" href="#map">3D map</a><a class="btn-out" href="#games">Mini-games</a><a class="btn-out" href="#planner">Travel planner</a></nav>
+
+<section class="mapx-sec" id="map" aria-labelledby="map-title"><div class="wrap sec-head sec-head-split"><div><h1 id="map-title">The map, in 3D</h1><p class="sec-lede">The real world around spawn, 5,000 blocks out from 0, 0 in every direction, rebuilt block for block from the server's own files. It redraws itself as players build, dig and blow things up. Player positions are never shown.</p></div><ul class="map3d-keys" aria-label="How to move around"><li class="on-mouse"><b>Drag</b><span>to move</span></li><li class="on-mouse"><b>Right-drag</b><span>to turn</span></li><li class="on-mouse"><b>Scroll</b><span>to zoom</span></li><li class="on-touch"><b>One finger</b><span>to move</span></li><li class="on-touch"><b>Two fingers</b><span>to turn and zoom</span></li></ul></div><div class="wrap wrap-wide"><div class="mapx" data-mapx data-state="idle" data-live="0"><div class="mapx-bar"><div class="seg" role="group" aria-label="World"><button type="button" data-mapx-world="world" aria-pressed="true">Overworld</button><button type="button" data-mapx-world="world_the_nether" aria-pressed="false">Nether</button><button type="button" data-mapx-world="world_the_end" aria-pressed="false">End</button></div><div class="seg" role="group" aria-label="View"><button type="button" data-mapx-mode="perspective" aria-pressed="true">3D</button><button type="button" data-mapx-mode="flat" aria-pressed="false">Top-down</button></div><div class="mapx-acts"><button type="button" class="tool" data-mapx-act="spawn" title="Back to 0, 0"><svg class="i" aria-hidden="true"><use href="#i-home"/></svg><span>Spawn</span></button><button type="button" class="tool" data-mapx-act="roll" title="Show where a new player might land"><svg class="i" aria-hidden="true"><use href="#i-dice"/></svg><span>Roll a spawn</span></button><button type="button" class="tool tool-icon" data-mapx-act="full" aria-label="Fill the screen with the map" title="Fill the screen"><svg class="i" aria-hidden="true"><use href="#i-expand"/></svg></button><a class="tool tool-icon" href="https://map.welloby.com/" target="_blank" rel="noopener" aria-label="Open the 3D map in a new tab" title="Open in a new tab"><svg class="i" aria-hidden="true"><use href="#i-ext"/></svg></a></div></div><div class="mapx-stage"><iframe title="Live 3D map of the Welloby world around spawn" data-mapx-frame allow="fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe><button type="button" class="mapx-gate" data-mapx-gate><span><b>Click to explore</b><small class="on-mouse">Drag to move, right-drag to turn, scroll to zoom</small><small class="on-touch">Drag to move, two fingers to turn and zoom</small></span></button><p class="mapx-note" data-mapx-note aria-live="polite"></p><div class="mapx-ask"><p data-mapx-ask="save">The 3D map is a big download, so it waits for you on a data-saving connection.</p><p data-mapx-ask="phone" hidden>The 3D map is a big download, so on phones it waits for a tap.</p><button type="button" class="btn btn-lava" data-mapx-load>Load the 3D map</button></div><div class="mapx-poster"><div class="mapx-poster-art"><svg class="map3d-island" viewBox="-180 3 360 210" aria-hidden="true" focusable="false" shape-rendering="crispEdges"><path d="M-44 20 L-22 31 L-22 55 L-44 44Z" fill="#635f59"/><path d="M-22 31 L0 20 L0 44 L-22 55Z" fill="#4b4944"/><path d="M-22 9 L0 20 L-22 31 L-44 20Z" fill="#8a857c"/><path d="M0 20 L22 31 L22 55 L0 44Z" fill="#4f6e26"/><path d="M22 31 L44 20 L44 44 L22 55Z" fill="#3d541d"/><path d="M22 9 L44 20 L22 31 L0 20Z" fill="#6f9a35"/><path d="M-110 31 L-88 42 L-88 66 L-110 55Z" fill="#4f6e26"/><path d="M-88 42 L-66 31 L-66 55 L-88 66Z" fill="#3d541d"/><path d="M-88 20 L-66 31 L-88 42 L-110 31Z" fill="#6f9a35"/><path d="M-66 31 L-44 42 L-44 66 L-66 55Z" fill="#4f6e26"/><path d="M-44 42 L-22 31 L-22 55 L-44 66Z" fill="#3d541d"/><path d="M-44 20 L-22 31 L-44 42 L-66 31Z" fill="#6f9a35"/><path d="M-22 19 L0 30 L0 66 L-22 55Z" fill="#4f6e26"/><path d="M0 30 L22 19 L22 55 L0 66Z" fill="#3d541d"/><path d="M0 8 L22 19 L0 30 L-22 19Z" fill="#6f9a35"/><path d="M22 19 L44 30 L44 66 L22 55Z" fill="#4f6e26"/><path d="M44 30 L66 19 L66 55 L44 66Z" fill="#3d541d"/><path d="M44 8 L66 19 L44 30 L22 19Z" fill="#6f9a35"/><path d="M66 19 L88 30 L88 66 L66 55Z" fill="#4f6e26"/><path d="M88 30 L110 19 L110 55 L88 66Z" fill="#3d541d"/><path d="M88 8 L110 19 L88 30 L66 19Z" fill="#6f9a35"/><path d="M-132 30 L-110 41 L-110 77 L-132 66Z" fill="#4f6e26"/><path d="M-110 41 L-88 30 L-88 66 L-110 77Z" fill="#3d541d"/><path d="M-110 19 L-88 30 L-110 41 L-132 30Z" fill="#6f9a35"/><path d="M-88 18 L-66 29 L-66 77 L-88 66Z" fill="#4f6e26"/><path d="M-66 29 L-44 18 L-44 66 L-66 77Z" fill="#3d541d"/><path d="M-66 7 L-44 18 L-66 29 L-88 18Z" fill="#6f9a35"/><path d="M-44 18 L-22 29 L-22 77 L-44 66Z" fill="#4f6e26"/><path d="M-22 29 L0 18 L0 66 L-22 77Z" fill="#3d541d"/><path d="M-22 7 L0 18 L-22 29 L-44 18Z" fill="#6f9a35"/><path d="M0 18 L22 29 L22 77 L0 66Z" fill="#4f6e26"/><path d="M22 29 L44 18 L44 66 L22 77Z" fill="#3d541d"/><path d="M22 7 L44 18 L22 29 L0 18Z" fill="#6f9a35"/><path d="M44 30 L66 41 L66 77 L44 66Z" fill="#4f6e26"/><path d="M66 41 L88 30 L88 66 L66 77Z" fill="#3d541d"/><path d="M66 19 L88 30 L66 41 L44 30Z" fill="#6f9a35"/><path d="M88 30 L110 41 L110 77 L88 66Z" fill="#4f6e26"/><path d="M110 41 L132 30 L132 66 L110 77Z" fill="#3d541d"/><path d="M110 19 L132 30 L110 41 L88 30Z" fill="#6f9a35"/><path d="M-154 53 L-132 64 L-132 88 L-154 77Z" fill="#4f6e26"/><path d="M-132 64 L-110 53 L-110 77 L-132 88Z" fill="#3d541d"/><path d="M-132 42 L-110 53 L-132 64 L-154 53Z" fill="#6f9a35"/><path d="M-110 29 L-88 40 L-88 88 L-110 77Z" fill="#4f6e26"/><path d="M-88 40 L-66 29 L-66 77 L-88 88Z" fill="#3d541d"/><path d="M-88 18 L-66 29 L-88 40 L-110 29Z" fill="#6f9a35"/><path d="M-66 29 L-44 40 L-44 88 L-66 77Z" fill="#635f59"/><path d="M-44 40 L-22 29 L-22 77 L-44 88Z" fill="#4b4944"/><path d="M-44 18 L-22 29 L-44 40 L-66 29Z" fill="#8a857c"/><path d="M-22 41 L0 52 L0 88 L-22 77Z" fill="#635f59"/><path d="M0 52 L22 41 L22 77 L0 88Z" fill="#4b4944"/><path d="M0 30 L22 41 L0 52 L-22 41Z" fill="#8a857c"/><path d="M22 29 L44 40 L44 88 L22 77Z" fill="#4f6e26"/><path d="M44 40 L66 29 L66 77 L44 88Z" fill="#3d541d"/><path d="M44 18 L66 29 L44 40 L22 29Z" fill="#6f9a35"/><path d="M66 41 L88 52 L88 88 L66 77Z" fill="#635f59"/><path d="M88 52 L110 41 L110 77 L88 88Z" fill="#4b4944"/><path d="M88 30 L110 41 L88 52 L66 41Z" fill="#8a857c"/><path d="M110 53 L132 64 L132 88 L110 77Z" fill="#4f6e26"/><path d="M132 64 L154 53 L154 77 L132 88Z" fill="#3d541d"/><path d="M132 42 L154 53 L132 64 L110 53Z" fill="#6f9a35"/><path d="M-132 52 L-110 63 L-110 99 L-132 88Z" fill="#4f6e26"/><path d="M-110 63 L-88 52 L-88 88 L-110 99Z" fill="#3d541d"/><path d="M-110 41 L-88 52 L-110 63 L-132 52Z" fill="#6f9a35"/><path d="M-88 40 L-66 51 L-66 99 L-88 88Z" fill="#4f6e26"/><path d="M-66 51 L-44 40 L-44 88 L-66 99Z" fill="#3d541d"/><path d="M-66 29 L-44 40 L-66 51 L-88 40Z" fill="#6f9a35"/><path d="M-44 40 L-22 51 L-22 99 L-44 88Z" fill="#57351e"/><path d="M-22 51 L0 40 L0 88 L-22 99Z" fill="#432817"/><path d="M-22 29 L0 40 L-22 51 L-44 40Z" fill="#7a4a2a"/><path d="M0 40 L22 51 L22 99 L0 88Z" fill="#57351e"/><path d="M22 51 L44 40 L44 88 L22 99Z" fill="#432817"/><path d="M22 29 L44 40 L22 51 L0 40Z" fill="#7a4a2a"/><path d="M44 40 L66 51 L66 99 L44 88Z" fill="#4f6e26"/><path d="M66 51 L88 40 L88 88 L66 99Z" fill="#3d541d"/><path d="M66 29 L88 40 L66 51 L44 40Z" fill="#6f9a35"/><path d="M88 52 L110 63 L110 99 L88 88Z" fill="#4f6e26"/><path d="M110 63 L132 52 L132 88 L110 99Z" fill="#3d541d"/><path d="M110 41 L132 52 L110 63 L88 52Z" fill="#6f9a35"/><path d="M-154 75 L-132 86 L-132 110 L-154 99Z" fill="#4f6e26"/><path d="M-132 86 L-110 75 L-110 99 L-132 110Z" fill="#3d541d"/><path d="M-132 64 L-110 75 L-132 86 L-154 75Z" fill="#6f9a35"/><path d="M-110 51 L-88 62 L-88 110 L-110 99Z" fill="#4f6e26"/><path d="M-88 62 L-66 51 L-66 99 L-88 110Z" fill="#3d541d"/><path d="M-88 40 L-66 51 L-88 62 L-110 51Z" fill="#6f9a35"/><path d="M-66 63 L-44 74 L-44 110 L-66 99Z" fill="#57351e"/><path d="M-44 74 L-22 63 L-22 99 L-44 110Z" fill="#432817"/><path d="M-44 52 L-22 63 L-44 74 L-66 63Z" fill="#7a4a2a"/><path d="M-22 75 L0 86 L0 110 L-22 99Z" fill="#b74c16"/><path d="M0 86 L22 75 L22 99 L0 110Z" fill="#8c3a11"/><path d="M0 64 L22 75 L0 86 L-22 75Z" fill="#ff6a1f"/><path d="M22 63 L44 74 L44 110 L22 99Z" fill="#57351e"/><path d="M44 74 L66 63 L66 99 L44 110Z" fill="#432817"/><path d="M44 52 L66 63 L44 74 L22 63Z" fill="#7a4a2a"/><path d="M66 51 L88 62 L88 110 L66 99Z" fill="#4f6e26"/><path d="M88 62 L110 51 L110 99 L88 110Z" fill="#3d541d"/><path d="M88 40 L110 51 L88 62 L66 51Z" fill="#6f9a35"/><path d="M110 63 L132 74 L132 110 L110 99Z" fill="#4f6e26"/><path d="M132 74 L154 63 L154 99 L132 110Z" fill="#3d541d"/><path d="M132 52 L154 63 L132 74 L110 63Z" fill="#6f9a35"/><path d="M-176 86 L-154 97 L-154 121 L-176 110Z" fill="#4f6e26"/><path d="M-154 97 L-132 86 L-132 110 L-154 121Z" fill="#3d541d"/><path d="M-154 75 L-132 86 L-154 97 L-176 86Z" fill="#6f9a35"/><path d="M-132 62 L-110 73 L-110 121 L-132 110Z" fill="#4f6e26"/><path d="M-110 73 L-88 62 L-88 110 L-110 121Z" fill="#3d541d"/><path d="M-110 51 L-88 62 L-110 73 L-132 62Z" fill="#6f9a35"/><path d="M-88 62 L-66 73 L-66 121 L-88 110Z" fill="#635f59"/><path d="M-66 73 L-44 62 L-44 110 L-66 121Z" fill="#4b4944"/><path d="M-66 51 L-44 62 L-66 73 L-88 62Z" fill="#8a857c"/><path d="M-44 86 L-22 97 L-22 121 L-44 110Z" fill="#b74c16"/><path d="M-22 97 L0 86 L0 110 L-22 121Z" fill="#8c3a11"/><path d="M-22 75 L0 86 L-22 97 L-44 86Z" fill="#ff6a1f"/><path d="M0 86 L22 97 L22 121 L0 110Z" fill="#b74c16"/><path d="M22 97 L44 86 L44 110 L22 121Z" fill="#8c3a11"/><path d="M22 75 L44 86 L22 97 L0 86Z" fill="#ff6a1f"/><path d="M44 62 L66 73 L66 121 L44 110Z" fill="#635f59"/><path d="M66 73 L88 62 L88 110 L66 121Z" fill="#4b4944"/><path d="M66 51 L88 62 L66 73 L44 62Z" fill="#8a857c"/><path d="M88 62 L110 73 L110 121 L88 110Z" fill="#4f6e26"/><path d="M110 73 L132 62 L132 110 L110 121Z" fill="#3d541d"/><path d="M110 51 L132 62 L110 73 L88 62Z" fill="#6f9a35"/><path d="M132 74 L154 85 L154 121 L132 110Z" fill="#4f6e26"/><path d="M154 85 L176 74 L176 110 L154 121Z" fill="#3d541d"/><path d="M154 63 L176 74 L154 85 L132 74Z" fill="#6f9a35"/><path d="M-154 85 L-132 96 L-132 132 L-154 121Z" fill="#4f6e26"/><path d="M-132 96 L-110 85 L-110 121 L-132 132Z" fill="#3d541d"/><path d="M-132 74 L-110 85 L-132 96 L-154 85Z" fill="#6f9a35"/><path d="M-110 85 L-88 96 L-88 132 L-110 121Z" fill="#57351e"/><path d="M-88 96 L-66 85 L-66 121 L-88 132Z" fill="#432817"/><path d="M-88 74 L-66 85 L-88 96 L-110 85Z" fill="#7a4a2a"/><path d="M-66 97 L-44 108 L-44 132 L-66 121Z" fill="#b74c16"/><path d="M-44 108 L-22 97 L-22 121 L-44 132Z" fill="#8c3a11"/><path d="M-44 86 L-22 97 L-44 108 L-66 97Z" fill="#ff6a1f"/><path d="M-22 61 L0 72 L0 132 L-22 121Z" fill="#1e1629"/><path d="M0 72 L22 61 L22 121 L0 132Z" fill="#17111f"/><path d="M0 50 L22 61 L0 72 L-22 61Z" fill="#2a1f3a"/><path d="M22 97 L44 108 L44 132 L22 121Z" fill="#b74c16"/><path d="M44 108 L66 97 L66 121 L44 132Z" fill="#8c3a11"/><path d="M44 86 L66 97 L44 108 L22 97Z" fill="#ff6a1f"/><path d="M66 85 L88 96 L88 132 L66 121Z" fill="#57351e"/><path d="M88 96 L110 85 L110 121 L88 132Z" fill="#432817"/><path d="M88 74 L110 85 L88 96 L66 85Z" fill="#7a4a2a"/><path d="M110 85 L132 96 L132 132 L110 121Z" fill="#4f6e26"/><path d="M132 96 L154 85 L154 121 L132 132Z" fill="#3d541d"/><path d="M132 74 L154 85 L132 96 L110 85Z" fill="#6f9a35"/><path d="M-176 108 L-154 119 L-154 143 L-176 132Z" fill="#4f6e26"/><path d="M-154 119 L-132 108 L-132 132 L-154 143Z" fill="#3d541d"/><path d="M-154 97 L-132 108 L-154 119 L-176 108Z" fill="#6f9a35"/><path d="M-132 84 L-110 95 L-110 143 L-132 132Z" fill="#4f6e26"/><path d="M-110 95 L-88 84 L-88 132 L-110 143Z" fill="#3d541d"/><path d="M-110 73 L-88 84 L-110 95 L-132 84Z" fill="#6f9a35"/><path d="M-88 84 L-66 95 L-66 143 L-88 132Z" fill="#57351e"/><path d="M-66 95 L-44 84 L-44 132 L-66 143Z" fill="#432817"/><path d="M-66 73 L-44 84 L-66 95 L-88 84Z" fill="#7a4a2a"/><path d="M-44 108 L-22 119 L-22 143 L-44 132Z" fill="#b74c16"/><path d="M-22 119 L0 108 L0 132 L-22 143Z" fill="#8c3a11"/><path d="M-22 97 L0 108 L-22 119 L-44 108Z" fill="#ff6a1f"/><path d="M0 108 L22 119 L22 143 L0 132Z" fill="#b74c16"/><path d="M22 119 L44 108 L44 132 L22 143Z" fill="#8c3a11"/><path d="M22 97 L44 108 L22 119 L0 108Z" fill="#ff6a1f"/><path d="M44 84 L66 95 L66 143 L44 132Z" fill="#57351e"/><path d="M66 95 L88 84 L88 132 L66 143Z" fill="#432817"/><path d="M66 73 L88 84 L66 95 L44 84Z" fill="#7a4a2a"/><path d="M88 96 L110 107 L110 143 L88 132Z" fill="#4f6e26"/><path d="M110 107 L132 96 L132 132 L110 143Z" fill="#3d541d"/><path d="M110 85 L132 96 L110 107 L88 96Z" fill="#6f9a35"/><path d="M132 108 L154 119 L154 143 L132 132Z" fill="#4f6e26"/><path d="M154 119 L176 108 L176 132 L154 143Z" fill="#3d541d"/><path d="M154 97 L176 108 L154 119 L132 108Z" fill="#6f9a35"/><path d="M-154 119 L-132 130 L-132 154 L-154 143Z" fill="#4f6e26"/><path d="M-132 130 L-110 119 L-110 143 L-132 154Z" fill="#3d541d"/><path d="M-132 108 L-110 119 L-132 130 L-154 119Z" fill="#6f9a35"/><path d="M-110 95 L-88 106 L-88 154 L-110 143Z" fill="#635f59"/><path d="M-88 106 L-66 95 L-66 143 L-88 154Z" fill="#4b4944"/><path d="M-88 84 L-66 95 L-88 106 L-110 95Z" fill="#8a857c"/><path d="M-66 107 L-44 118 L-44 154 L-66 143Z" fill="#635f59"/><path d="M-44 118 L-22 107 L-22 143 L-44 154Z" fill="#4b4944"/><path d="M-44 96 L-22 107 L-44 118 L-66 107Z" fill="#8a857c"/><path d="M-22 119 L0 130 L0 154 L-22 143Z" fill="#b74c16"/><path d="M0 130 L22 119 L22 143 L0 154Z" fill="#8c3a11"/><path d="M0 108 L22 119 L0 130 L-22 119Z" fill="#ff6a1f"/><path d="M22 107 L44 118 L44 154 L22 143Z" fill="#635f59"/><path d="M44 118 L66 107 L66 143 L44 154Z" fill="#4b4944"/><path d="M44 96 L66 107 L44 118 L22 107Z" fill="#8a857c"/><path d="M66 95 L88 106 L88 154 L66 143Z" fill="#4f6e26"/><path d="M88 106 L110 95 L110 143 L88 154Z" fill="#3d541d"/><path d="M88 84 L110 95 L88 106 L66 95Z" fill="#6f9a35"/><path d="M110 107 L132 118 L132 154 L110 143Z" fill="#4f6e26"/><path d="M132 118 L154 107 L154 143 L132 154Z" fill="#3d541d"/><path d="M132 96 L154 107 L132 118 L110 107Z" fill="#6f9a35"/><path d="M-132 118 L-110 129 L-110 165 L-132 154Z" fill="#4f6e26"/><path d="M-110 129 L-88 118 L-88 154 L-110 165Z" fill="#3d541d"/><path d="M-110 107 L-88 118 L-110 129 L-132 118Z" fill="#6f9a35"/><path d="M-88 106 L-66 117 L-66 165 L-88 154Z" fill="#4f6e26"/><path d="M-66 117 L-44 106 L-44 154 L-66 165Z" fill="#3d541d"/><path d="M-66 95 L-44 106 L-66 117 L-88 106Z" fill="#6f9a35"/><path d="M-44 106 L-22 117 L-22 165 L-44 154Z" fill="#57351e"/><path d="M-22 117 L0 106 L0 154 L-22 165Z" fill="#432817"/><path d="M-22 95 L0 106 L-22 117 L-44 106Z" fill="#7a4a2a"/><path d="M0 106 L22 117 L22 165 L0 154Z" fill="#57351e"/><path d="M22 117 L44 106 L44 154 L22 165Z" fill="#432817"/><path d="M22 95 L44 106 L22 117 L0 106Z" fill="#7a4a2a"/><path d="M44 94 L66 105 L66 165 L44 154Z" fill="#4f6e26"/><path d="M66 105 L88 94 L88 154 L66 165Z" fill="#3d541d"/><path d="M66 83 L88 94 L66 105 L44 94Z" fill="#6f9a35"/><path d="M88 118 L110 129 L110 165 L88 154Z" fill="#4f6e26"/><path d="M110 129 L132 118 L132 154 L110 165Z" fill="#3d541d"/><path d="M110 107 L132 118 L110 129 L88 118Z" fill="#6f9a35"/><path d="M-154 129 L-132 140 L-132 176 L-154 165Z" fill="#4f6e26"/><path d="M-132 140 L-110 129 L-110 165 L-132 176Z" fill="#3d541d"/><path d="M-132 118 L-110 129 L-132 140 L-154 129Z" fill="#6f9a35"/><path d="M-110 117 L-88 128 L-88 176 L-110 165Z" fill="#4f6e26"/><path d="M-88 128 L-66 117 L-66 165 L-88 176Z" fill="#3d541d"/><path d="M-88 106 L-66 117 L-88 128 L-110 117Z" fill="#6f9a35"/><path d="M-66 117 L-44 128 L-44 176 L-66 165Z" fill="#4f6e26"/><path d="M-44 128 L-22 117 L-22 165 L-44 176Z" fill="#3d541d"/><path d="M-44 106 L-22 117 L-44 128 L-66 117Z" fill="#6f9a35"/><path d="M-22 129 L0 140 L0 176 L-22 165Z" fill="#57351e"/><path d="M0 140 L22 129 L22 165 L0 176Z" fill="#432817"/><path d="M0 118 L22 129 L0 140 L-22 129Z" fill="#7a4a2a"/><path d="M22 117 L44 128 L44 176 L22 165Z" fill="#4f6e26"/><path d="M44 128 L66 117 L66 165 L44 176Z" fill="#3d541d"/><path d="M44 106 L66 117 L44 128 L22 117Z" fill="#6f9a35"/><path d="M66 117 L88 128 L88 176 L66 165Z" fill="#4f6e26"/><path d="M88 128 L110 117 L110 165 L88 176Z" fill="#3d541d"/><path d="M88 106 L110 117 L88 128 L66 117Z" fill="#6f9a35"/><path d="M110 141 L132 152 L132 176 L110 165Z" fill="#4f6e26"/><path d="M132 152 L154 141 L154 165 L132 176Z" fill="#3d541d"/><path d="M132 130 L154 141 L132 152 L110 141Z" fill="#6f9a35"/><path d="M-132 140 L-110 151 L-110 187 L-132 176Z" fill="#635f59"/><path d="M-110 151 L-88 140 L-88 176 L-110 187Z" fill="#4b4944"/><path d="M-110 129 L-88 140 L-110 151 L-132 140Z" fill="#8a857c"/><path d="M-88 140 L-66 151 L-66 187 L-88 176Z" fill="#4f6e26"/><path d="M-66 151 L-44 140 L-44 176 L-66 187Z" fill="#3d541d"/><path d="M-66 129 L-44 140 L-66 151 L-88 140Z" fill="#6f9a35"/><path d="M-44 128 L-22 139 L-22 187 L-44 176Z" fill="#4f6e26"/><path d="M-22 139 L0 128 L0 176 L-22 187Z" fill="#3d541d"/><path d="M-22 117 L0 128 L-22 139 L-44 128Z" fill="#6f9a35"/><path d="M0 140 L22 151 L22 187 L0 176Z" fill="#635f59"/><path d="M22 151 L44 140 L44 176 L22 187Z" fill="#4b4944"/><path d="M22 129 L44 140 L22 151 L0 140Z" fill="#8a857c"/><path d="M44 140 L66 151 L66 187 L44 176Z" fill="#4f6e26"/><path d="M66 151 L88 140 L88 176 L66 187Z" fill="#3d541d"/><path d="M66 129 L88 140 L66 151 L44 140Z" fill="#6f9a35"/><path d="M88 152 L110 163 L110 187 L88 176Z" fill="#4f6e26"/><path d="M110 163 L132 152 L132 176 L110 187Z" fill="#3d541d"/><path d="M110 141 L132 152 L110 163 L88 152Z" fill="#6f9a35"/><path d="M-110 163 L-88 174 L-88 198 L-110 187Z" fill="#4f6e26"/><path d="M-88 174 L-66 163 L-66 187 L-88 198Z" fill="#3d541d"/><path d="M-88 152 L-66 163 L-88 174 L-110 163Z" fill="#6f9a35"/><path d="M-66 151 L-44 162 L-44 198 L-66 187Z" fill="#4f6e26"/><path d="M-44 162 L-22 151 L-22 187 L-44 198Z" fill="#3d541d"/><path d="M-44 140 L-22 151 L-44 162 L-66 151Z" fill="#6f9a35"/><path d="M-22 151 L0 162 L0 198 L-22 187Z" fill="#4f6e26"/><path d="M0 162 L22 151 L22 187 L0 198Z" fill="#3d541d"/><path d="M0 140 L22 151 L0 162 L-22 151Z" fill="#6f9a35"/><path d="M22 151 L44 162 L44 198 L22 187Z" fill="#4f6e26"/><path d="M44 162 L66 151 L66 187 L44 198Z" fill="#3d541d"/><path d="M44 140 L66 151 L44 162 L22 151Z" fill="#6f9a35"/><path d="M66 163 L88 174 L88 198 L66 187Z" fill="#4f6e26"/><path d="M88 174 L110 163 L110 187 L88 198Z" fill="#3d541d"/><path d="M88 152 L110 163 L88 174 L66 163Z" fill="#6f9a35"/><path d="M-44 162 L-22 173 L-22 209 L-44 198Z" fill="#4f6e26"/><path d="M-22 173 L0 162 L0 198 L-22 209Z" fill="#3d541d"/><path d="M-22 151 L0 162 L-22 173 L-44 162Z" fill="#6f9a35"/><path d="M0 174 L22 185 L22 209 L0 198Z" fill="#4f6e26"/><path d="M22 185 L44 174 L44 198 L22 209Z" fill="#3d541d"/><path d="M22 163 L44 174 L22 185 L0 174Z" fill="#6f9a35"/></svg></div><div class="mapx-poster-cta"><a class="btn btn-lava btn-l" href="https://map.welloby.com/" target="_blank" rel="noopener">Open the 3D map<svg class="i" aria-hidden="true"><use href="#i-ext"/></svg></a><p class="fine">Opens in a new tab. On a phone, use two fingers to turn and zoom.</p></div></div></div></div><p class="mapx-foot">The Overworld out to 5,000 blocks from 0, 0, plus the Nether and the End near their centers. Coordinates posted on the <a href="community.html#/forum">community forum</a> open right here.</p></div></section>
+
+<section class="games-sec" id="games" aria-labelledby="games-title">
+  <div class="wrap sec-head">
+    <h2 id="games-title">Mini-games</h2>
+    <p class="sec-lede">Two small games. Spawn Guessr drops you at a real spot on the live 3D map and you pin where it is. Elytra Dive is a flight under the sealed Nether roof. Best scores stay in this browser.</p>
+  </div>
+  <div class="wrap wrap-wide">
+    <div class="cab" data-cab>
+      <div class="cab-bar">
+        <div class="seg" role="group" aria-label="Choose a game">
+          <button type="button" data-game-pick="guessr" aria-pressed="true">Spawn Guessr</button>
+          <button type="button" data-game-pick="elytra" aria-pressed="false">Elytra Dive</button>
+        </div>
+        <p class="cab-best" data-cab-best></p>
+      </div>
+
+      <div class="gs gs3" data-gs data-state="idle">
+        <div class="gs3-stage" data-gs-stage>
+          <iframe class="gs3-frame" title="Spawn Guessr on the live 3D map" data-gs-frame allow="fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+          <div class="gs3-shield" aria-hidden="true"></div>
+          <div class="gs3-cross" aria-hidden="true"></div>
+          <div class="gs3-veil" data-gs-veil data-on="1" aria-hidden="true"></div>
+          <p class="gs-cap" data-gs-cap></p>
+          <p class="gs-read" data-gs-read aria-live="polite"></p>
+          <div class="gs-over" data-gs-over></div>
+        </div>
+        <div class="gs-bar">
+          <p class="gs-round"><b data-gs-round>5 rounds</b><span data-gs-score>Up to 1,000 points each</span></p>
+          <div class="gs-diff">
+            <label for="gs-diff">Difficulty <b data-gs-diff-name>Normal</b> <small data-gs-diff-size>turning view</small></label>
+            <input id="gs-diff" type="range" min="0" max="4" step="1" value="1" data-gs-diff>
+          </div>
+          <div class="seg seg-s" role="group" aria-label="Area to search">
+            <button type="button" data-gs-area="inner" aria-pressed="true">Near spawn</button>
+            <button type="button" data-gs-area="full" aria-pressed="false">Out to 5,000</button>
+          </div>
+          <div class="gs-acts">
+            <button type="button" class="btn btn-line btn-s" data-gs-hint hidden>Look wider <small>costs 30%</small></button>
+            <button type="button" class="btn btn-lava" data-gs-go disabled>Make a guess</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ed" data-ed hidden>
+        <div class="ed-stage" data-ed-stage>
+          <canvas class="ed-c" data-ed-canvas role="img" aria-label="Elytra Dive. A glider flies through a Nether cave between basalt pillars."></canvas>
+          <div class="ed-over" data-ed-over></div>
+          <button type="button" class="ed-rocket" data-ed-rocket hidden>Rocket <b data-ed-rockets>3</b></button>
+        </div>
+        <div class="ed-bar">
+          <div class="seg seg-s" role="group" aria-label="Difficulty">
+            <button type="button" data-ed-diff="chill" aria-pressed="false">Chill</button>
+            <button type="button" data-ed-diff="normal" aria-pressed="true">Normal</button>
+            <button type="button" data-ed-diff="brutal" aria-pressed="false">Brutal</button>
+          </div>
+          <p class="ed-help">Hold the mouse, a finger or Space to lift the nose. Let go and it drops. Climbing spends speed and diving earns it, so dive before you climb. Below 7 blocks a second you stall. Rockets (<kbd>R</kbd>) give a burst of speed, and you can pick more up in the gaps. <kbd>P</kbd> pauses.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="paper">
+<section class="planner" id="planner" aria-labelledby="planner-title">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2 id="planner-title">How far is far?</h2>
+      <p class="sec-lede">Bases survive by distance. Pick one and see how long the trip takes on foot, on a horse, by elytra or by ice boat, and how much the Nether saves.</p>
+    </div>
+    <div class="pl" data-planner>
+      <div class="pl-in">
+        <label class="pl-label" for="pl-num">Distance</label>
+        <p class="pl-num-row"><input id="pl-num" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" value="10,000" data-pl-num><span>blocks</span></p>
+        <input class="pl-range" type="range" min="0" max="1000" step="1" value="600" data-pl-range aria-label="Distance in blocks, from 10 to 1,000,000">
+        <p class="pl-ends" aria-hidden="true"><span style="left:0">10</span><span style="left:20%">100</span><span style="left:40%">1,000</span><span style="left:60%">10k</span><span style="left:80%">100k</span><span style="left:100%">1M</span></p>
+        <div class="pl-presets" role="group" aria-label="Common distances">
+          <button type="button" data-pl-set="1000"><b>1,000</b><small>Edge of the spawn ring</small></button>
+          <button type="button" data-pl-set="5000"><b>5,000</b><small>Farthest /sethome</small></button>
+          <button type="button" data-pl-set="10000"><b>10,000</b><small>Out of sight</small></button>
+          <button type="button" data-pl-set="100000"><b>100,000</b><small>Serious hiding</small></button>
+        </div>
+        <label class="pl-check"><input type="checkbox" data-pl-nether><span><b>Go through the Nether</b><small>Every Nether block counts as eight up here. The roof is sealed, so the trip runs through the caves.</small></span></label>
+      </div>
+      <div class="pl-out">
+        <p class="pl-sum" data-pl-sum aria-live="polite"></p>
+        <ul class="pl-rows" data-pl-rows></ul>
+        <p class="pl-food" data-pl-food></p>
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+
+</main>
+
+<footer class="site-foot" id="footer">
+  <div class="frame">
+    <div class="ft-top"><a class="ft-logo" href="index.html" aria-label="Welloby, home"><img src="media/wordmark.svg" width="134" height="24" alt=""></a>
+      <div class="ft-ips"><div class="ipfield"><span class="ipfield-stack"><span class="ipfield-k">Java</span><code translate="no">mc.welloby.com</code></span><button type="button" class="btn-out" data-copy="mc.welloby.com" data-copy-label="mc.welloby.com" data-copy-where="In Minecraft, choose Multiplayer, then Add Server, and paste it into Server Address." aria-label="Copy the Java address, mc.welloby.com"><svg class="i when-idle" aria-hidden="true"><use href="#i-copy"/></svg><svg class="i when-copied" aria-hidden="true"><use href="#i-check"/></svg><span class="when-idle">Copy</span><span class="when-copied">Copied</span></button></div><div class="ipfield"><span class="ipfield-stack"><span class="ipfield-k">Bedrock</span><code translate="no">bedrock.welloby.com</code></span><button type="button" class="btn-out" data-copy="bedrock.welloby.com" data-copy-label="bedrock.welloby.com" data-copy-where="In Minecraft, choose Play, then Servers, then Add Server, and paste it into Server Address. The port is 25620." aria-label="Copy the Bedrock address, bedrock.welloby.com"><svg class="i when-idle" aria-hidden="true"><use href="#i-copy"/></svg><svg class="i when-copied" aria-hidden="true"><use href="#i-check"/></svg><span class="when-idle">Copy</span><span class="when-copied">Copied</span></button></div><div class="ipfield"><span class="ipfield-stack"><span class="ipfield-k">Port</span><code translate="no">25620</code></span><button type="button" class="btn-out" data-copy="25620" data-copy-label="the port, 25620" data-copy-where="Paste it into Port, under the server address." aria-label="Copy the Bedrock port, 25620"><svg class="i when-idle" aria-hidden="true"><use href="#i-copy"/></svg><svg class="i when-copied" aria-hidden="true"><use href="#i-check"/></svg><span class="when-idle">Copy</span><span class="when-copied">Copied</span></button></div></div></div>
+    <nav class="ft-cols" aria-label="Footer"><div><h2>Welloby</h2><ul><li><a href="index.html#join">How to join</a></li><li><a href="index.html#rules">Rules</a></li><li><a href="index.html#faq">FAQ</a></li><li><a href="faq.html#server-info">Server info</a></li><li><a href="#map">3D map</a></li><li><a href="#games">Mini-games</a></li><li><a href="#planner">Travel planner</a></li><li><a href="index.html#vote">Vote</a></li><li><a href="index.html#donate">Donate</a></li></ul></div><div><h2>Community</h2><ul><li><a href="community.html">Overview</a></li><li><a href="community.html#/forum">Forum</a></li><li><a href="community.html#/clans">Clans</a></li><li><a href="community.html#/players">Players</a></li><li><a href="community.html#/messages">Messages</a></li><li><a href="community.html#/supporters">Supporters</a></li></ul></div><div><h2>Server list</h2><ul><li><a href="servers.html">All servers</a></li><li><a href="servers.html#/servers/new">List your server</a></li></ul></div><div><h2>Follow</h2><ul><li><a href="https://discord.gg/cwHKDtXQWD" target="_blank" rel="noopener">Discord</a></li><li><a href="https://www.tiktok.com/@wellobyanarchy" target="_blank" rel="noopener">TikTok</a></li><li><a href="https://www.youtube.com/@wellobyanarchy" target="_blank" rel="noopener">YouTube</a></li><li><a href="https://www.instagram.com/welloby_official/" target="_blank" rel="noopener">Instagram</a></li><li><a href="https://t.me/wellobyanarchy" target="_blank" rel="noopener">Telegram</a></li><li><a href="https://x.com/WellobyLLC" target="_blank" rel="noopener">X (Twitter)</a></li><li><a href="watch.html">Watch and follow</a></li></ul></div><div><h2>Help and legal</h2><ul><li><button type="button" data-ask="">Help bot</button></li><li><a href="index.html#contact">Contact (Discord)</a></li><li><a href="terms.html">Terms</a></li><li><a href="privacy.html">Privacy</a></li><li><a href="watch.html#brand">Brand kit</a></li></ul></div></nav>
+    <p class="ft-about">Welloby Anarchy is a free, public, cracked-friendly 2b2t-style Minecraft anarchy server hosted in Europe. Java 1.7.2 to 26.3 connects at mc.welloby.com; Bedrock connects at bedrock.welloby.com, port 25620. There is no whitelist, rank, shop or pay-to-win, and the queue only forms when the server is full. The map opened in September 2026 and never resets. Every player, cracked or premium, registers a password on first join and logs in with it after that.</p>
+    <p class="ft-legal">Playing on Welloby, joining its Discord or using this site means you accept the <a href="terms.html">Terms</a>. Welloby is not affiliated with 2b2t, Mojang or Microsoft. Minecraft is a trademark of Mojang AB.</p>
+  </div>
+</footer>
+
+<div class="toast" role="status" aria-live="polite" data-show="0"></div>
+</body>
+</html>

@@ -26,20 +26,23 @@
     raid: "raided", killed: "kill", killing: "kill", kills: "kill", died: "die", dying: "die",
     spawned: "spawn", spawning: "spawn", homes: "home", sethome: "sethome", "2b": "2b2t",
     ipad: "tablet", iphone: "phone", samsung: "android", america: "usa", american: "usa", na: "usa", canada: "usa",
-    accs: "accounts", acc: "account", wiped: "wipe", wiping: "wipe", wipes: "wipe"
+    accs: "accounts", acc: "account", wiped: "wipe", wiping: "wipe", wipes: "wipe",
+    // "on the site" and "welloby.com" mean the website, which tells its account answers apart from the game's
+    site: "website", com: "website", web: "website", webpage: "website"
   };
   var STOP = {};
   ("a an the is are am was were be been being to of in on at for it its this that these those i me my mine you your we our us " +
    "do does did can could would should will shall may might must how what where when why who which there here with and or so " +
    "just please hey get got have has had any some then than if about like really very much many there's also too only even " +
    "want need know tell show give let going try make made one ones thing things way ways guys bro man dude okay pls server servers " +
-   "welloby minecraft kevzy").split(" ").forEach(function (w) { STOP[w] = 1; });
+   "welloby minecraft kevzy into").split(" ").forEach(function (w) { STOP[w] = 1; });
 
   function clean(s) {
     return String(s || "").toLowerCase()
       .replace(/[\u2018\u2019']/g, "")
       .replace(/x-ray/g, "xray").replace(/ko-fi/g, "kofi").replace(/2b2t/g, "2b2t ")
       .replace(/24\s*\/\s*7/g, " twentyfourseven ")
+      .replace(/\b(cant|cannot|can not|dont|do not) (remember|recall)\b/g, " forgot ")
       .replace(/\b(dont|do not|no|without|non)[\s-]+(have\s+)?(a\s+)?(premium|paid|legit|real|bought)\b/g, " nopremium ")
       .replace(/(\d)\s*k\b/g, "$1000")
       .replace(/[^a-z0-9\-\s]/g, " ")
@@ -277,8 +280,7 @@
       tiktokUrl: (W.links && W.links.tiktok) || "#watch", instagramUrl: (W.links && W.links.instagram) || "#watch",
       telegramUrl: (W.links && W.links.telegram) || "#watch",
       map3dUrl: (W.map3d && W.map3d.url) || "#map",
-      kofi: W.donate && W.donate.kofi,
-      calls: "api.mcstatus.io for the status light" + (W.donate && W.donate.stateUrl ? ", and the donation counter for the monthly goal" : "")
+      kofi: W.donate && W.donate.kofi
     };
   }
   var root = document.createElement("div");
@@ -338,6 +340,9 @@
       if (kind === "url" || kind === "donate") {
         el = document.createElement("a");
         el.href = kind === "donate" ? v.kofi : arg; el.target = "_blank"; el.rel = "noopener";
+      } else if (kind === "page") {
+        el = document.createElement("a");
+        el.href = arg;
       } else {
         el = document.createElement("button"); el.type = "button";
         el.addEventListener("click", function () { run(kind, arg); });
@@ -402,9 +407,9 @@
     if (started) return;
     started = true;
     var v = vars();
-    var row = bubble("bot", rich(fill("yo, i'm {name}. ask me anything about welloby: joining, rules, hacks, money, the map. i also do nether coords and travel times.", v)));
+    var row = bubble("bot", rich(fill("yo, i'm {name}. ask me anything about welloby: joining, rules, hacks, money, the map, or this website's accounts and clans. i also do nether coords and travel times.", v)));
     actions(row, [["Copy {ip}", "copy:{ip}"]], v);
-    chips(["how do i join", "is it cracked", "what are the rules", "play a game", "roll a spawn"]);
+    chips(["how do i join", "is it cracked", "what are the rules", "how do i join a clan"]);
   }
   function open(question) {
     if (panel.hidden) {
