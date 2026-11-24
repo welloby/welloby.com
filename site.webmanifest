@@ -1,6 +1,7 @@
 {
   "name": "Welloby",
   "short_name": "Welloby",
+  "id": "/community",
   "start_url": "community",
   "scope": "./",
   "display": "standalone",

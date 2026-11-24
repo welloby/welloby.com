@@ -838,7 +838,11 @@
           <header class="panel-h"><h2>Allies and wars</h2><p class="muted">Green lines are allies, red lines are wars. Tap a banner to open the clan. You can drag the banners.</p></header>
           <div class="diplo-map" data-diplo></div>
         </section>
-      </div>`, "Clans", () => diplomacy($("[data-diplo]", app), all, d.relations));
+        <section class="panel teams" id="teams" aria-labelledby="teams-h">
+          <header class="panel-h"><h2 id="teams-h">Teams in the game</h2><p class="muted">Teams are made in the game with <code>/team create &lt;name&gt;</code>. Clans are made here on the site. A clan leader who proves their in-game name can link the two.</p></header>
+          <div data-teams aria-live="polite"><p class="muted teams-wait">Loading teams...</p></div>
+        </section>
+      </div>`, "Clans", () => { diplomacy($("[data-diplo]", app), all, d.relations); teamsPart(); });
     wireWaiting(() => { const l = $("[data-mylist]", app); if (l && !l.children.length) l.closest("section").remove(); });
     /* typing filters the list in place: the search box keeps its focus and the phone keyboard stays open */
     const link = f => { const p = new URLSearchParams(); if (f.q.value.trim()) p.set("q", f.q.value.trim()); if (f.sort.value !== "members") p.set("sort", f.sort.value); if (f.recruiting.checked) p.set("recruiting", "1"); return "#/clans" + (p.toString() ? "?" + p : ""); };
@@ -850,6 +854,29 @@
       $("[data-ccount]", app).textContent = clanCount(r.clans.length, !!(p.get("q") || p.get("recruiting")));
     });
   });
+  /* "Teams in the game": read only, from the game's own list through the API. Members are named, never counted, and
+     no number of teams or players is printed anywhere (the owner's rule).
+     It loads after the clans so a slow game server never holds the page; any trouble is a calm line, not an error. */
+  const teamDate = iso => { const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(iso || ""); return m ? new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""; };
+  const teamList = (label, names) => names.length ? `<div class="team-row"><dt>${label}</dt><dd>${names.map(n => `<span class="chip">${esc(n)}</span>`).join("")}</dd></div>` : "";
+  const teamCard = t => `<li class="team">
+      <h3>${esc(t.name)}</h3>
+      <p class="team-meta">Led by <b>${esc(t.leader)}</b>${teamDate(t.founded) ? ` \u00b7 started ${esc(teamDate(t.founded))}` : ""}</p>
+      <dl class="team-rows">${teamList("Members", t.members)}${teamList("Allies", t.allies)}${teamList("Enemies", t.enemies)}</dl>
+      ${t.clan && t.clan.tag ? `<p class="team-clan">Clan on the site: <a href="#/c/${enc(t.clan.tag)}">${esc(t.clan.name)} [${esc(t.clan.tag)}]</a></p>` : ""}
+    </li>`;
+  async function teamsPart() {
+    const box = $("[data-teams]", app);
+    if (!box) return;
+    let d = null;
+    try { d = await api("/teams"); } catch (e) { d = null; }
+    if ($("[data-teams]", app) !== box) return;   // the page changed meanwhile
+    if (!d || !d.ok || !Array.isArray(d.teams)) { box.innerHTML = `<p class="muted teams-wait">Teams will show here soon.</p>`; return; }
+    if (!d.teams.length) { box.innerHTML = empty("No teams yet. Make the first one in the game with <code>/team create &lt;name&gt;</code>."); return; }
+    box.innerHTML = `<ul class="team-list" data-stagger>${d.teams.map(teamCard).join("")}</ul>
+      <p class="muted team-upd">Updated ${when(d.updated)}. Biggest teams first.</p>`;
+    $$("[data-stagger] > *", box).forEach((el, i) => el.style.setProperty("--i", Math.min(i, 14)));
+  }
   // while a search is on, the count is what it found, not every clan
   const clanCount = (n, found) => (found ? `${n === 1 ? "1 clan" : fmt(n) + " clans"} found` : plural(n, "clan"));
 
@@ -1032,6 +1059,26 @@
       // the staff sorting out a clan see who it invited, without the form
       : staffOnly && invites.length ? `<section class="panel" id="invite"><header class="panel-h"><h2>Sent invites</h2><span class="count">${invites.length}</span></header>
         <ul class="reqs">${invites.map(i => `<li>${head(i.user, 32)}<div><a href="${WC.userHref(i.user)}"><b>${esc(i.user.name)}</b></a><small>${i.by ? "by " + esc(i.by) + " \u00b7 " : ""}${ago(i.created)}${endsIn(i.expires)}</small></div></li>`).join("")}</ul></section>` : "";
+    /* the team in the game this clan is linked to. The link is by the team's number and holds only while the clan's
+       leader, with a proven in-game name, leads that team; the leader is offered it with one press, nobody else is */
+    const tm = d.team || { state: "none" }, offer = leader && d.teamOffer ? d.teamOffer : null;
+    const linkBtn = offer ? `<p class="form-acts"><button type="button" class="btn btn-lava" data-teamlink="${esc(offer.id)}">Link ${esc(c.name)} to team ${esc(offer.name)}</button></p>${errBox()}` : "";
+    const unlinkBtn = leader || staffOnly ? `<button type="button" class="link" data-teamunlink>Unlink the team</button>` : "";
+    const teamPanel = tm.state === "linked" ? `<section class="panel clanteam" id="team"><header class="panel-h"><h2>Team in the game</h2><span class="chip chip-ok">Linked</span></header>
+          <h3 class="clanteam-name">${esc(tm.name)}</h3>
+          <p class="team-meta">Led by <b>${esc(tm.leader)}</b>${teamDate(tm.founded) ? ` \u00b7 started ${esc(teamDate(tm.founded))}` : ""}</p>
+          <dl class="team-rows">${teamList("Members", tm.members)}${teamList("Allies", tm.allies)}${teamList("Enemies", tm.enemies)}</dl>
+          <p class="fine">This is the team as it is in the game right now. Updated ${when(tm.updated)}. ${unlinkBtn}</p></section>`
+      : tm.state === "wait" ? `<section class="panel clanteam" id="team"><header class="panel-h"><h2>Team in the game</h2></header><p class="muted">The team will show here soon.</p></section>`
+      : tm.state === "paused" && (officer || staffOnly) ? `<section class="panel clanteam${offer ? " panel-hot" : ""}" id="team"><header class="panel-h"><h2>Team in the game</h2><span class="chip chip-warn">Paused</span></header>
+          <p>The link to the team is paused. It needs the clan's leader to lead the team in the game, with a proven in-game name. ${offer ? `You lead the team <b>${esc(offer.name)}</b>, so you can link it again.` : "It comes back by itself when they match again."}</p>
+          ${linkBtn}<p class="fine">${unlinkBtn}</p></section>`
+      : tm.state === "none" && offer ? `<section class="panel panel-hot clanteam" id="team"><header class="panel-h"><h2>Team in the game</h2></header>
+          <p>You lead the team <b>${esc(offer.name)}</b> in the game. Link it, and its members, allies and enemies show on this page.</p>${linkBtn}</section>`
+      : tm.state === "none" && leader && health().link ? `<section class="panel clanteam" id="team"><header class="panel-h"><h2>Team in the game</h2></header>
+          <p class="muted">${u.verified ? "When you lead a team in the game, you can link it to this clan here. Make one with <code>/team create &lt;name&gt;</code>."
+            : 'Do you lead a team in the game? <a href="#/settings#pprove">Prove your in-game name</a> in Settings, then you can link the team to this clan.'}</p></section>`
+      : "";
     show(`
       <section class="clanhero" style="--cc:${COLORS[c.color] || COLORS.lava}">
         <div class="clanhero-bg" aria-hidden="true"></div>
@@ -1056,6 +1103,7 @@
               <div><a class="roster-name" href="${WC.userHref(p)}">${esc(p.name)}</a>${badges(p, true)}<small><b class="role role-${p.clan && p.clan.role}">${ROLE_NAMES[p.clan && p.clan.role] || ""}</b> \u00b7 joined ${ago(p.joined)}</small></div>
               ${rosterActs(p)}
             </li>`).join("")}</ul></section>
+          ${teamPanel}
         </div>
         <aside class="clanside">
           ${requests.length ? "" : reqPanel}
@@ -1072,6 +1120,15 @@
       </div>`, c.name);
     const reload = () => route();
     wireWaiting();
+    on("click", "[data-teamlink]", (e, b) => busy(b, async () => {
+      formErr(b.closest("section"), "");
+      try { const r = await api(`/clans/${enc(c.tag)}/team`, { body: { id: Number(b.dataset.teamlink) } }); toast(`${c.name} is linked to team ${r.team}`); burstAt(b); reload(); }
+      catch (err) { formErr(b.closest("section"), err); }
+    }));
+    on("click", "[data-teamunlink]", (e, b) => twice(b, () => busy(b, async () => {
+      try { await api(`/clans/${enc(c.tag)}/team`, { method: "DELETE" }); toast("The team is unlinked"); reload(); }
+      catch (err) { toast(err.message); }
+    }), "Click again to unlink"));
     on("click", "[data-scrollto]", (e, b) => { const t = document.getElementById(b.dataset.scrollto); if (t) t.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" }); });
     on("click", "[data-join]", (e, b) => busy(b, async () => { try { await api(`/clans/${enc(c.tag)}/join`, { body: {} }); toast("Welcome to " + c.name); burstAt(b); await WC.refreshMe(); reload(); } catch (err) { toast(err.message); } }));
     on("submit", "[data-ask]", (e, f) => busy($("button", f), async () => {
@@ -1628,7 +1685,7 @@
           <div class="pf-id">
             ${crumbs([["#/players", "Players"], [null, u.name]])}
             <h1 class="nm">${esc(u.name)}</h1>
-            ${u.ign ? `<p class="pf-ign">In game <b>${esc(u.ign)}</b>${u.verified ? " <small>checked by the staff</small>" : ""}</p>` : ""}
+            ${u.ign ? `<p class="pf-ign">In game <b>${esc(u.ign)}</b>${u.verified ? " <small>proven</small>" : ""}</p>` : ""}
             <p class="pf-badges">${badges(u) || ""}${u.role === "player" && !u.supporter && !u.verified ? '<span class="muted">Player</span>' : ""}</p>
             ${u.clan ? `<a class="pf-clan" href="#/c/${enc(u.clan.tag)}">${banner(u.clan.banner, "bnr-s")}<span><b>${esc(u.clan.name)}</b><small>${ROLE_NAMES[u.clan.role]} of [${esc(u.clan.tag)}]</small></span></a>` : '<p class="muted">No clan. A lone wolf, for now.</p>'}
             ${u.tags.length ? `<ul class="tags">${u.tags.map(t => `<li>${esc(TAG_NAMES[t] || t)}</li>`).join("")}</ul>` : ""}
@@ -2621,13 +2678,20 @@
               <p><button type="button" class="btn btn-ink btn-s" data-reroll>${icon("i-dice")}New face</button> <button type="button" class="btn btn-line btn-s" data-original>Original</button></p></div></div>
             <label class="fld"><span>In-game name <small>optional; vote rewards go here</small></span>
               <input name="ign" value="${esc(pf.ign)}" maxlength="17" spellcheck="false" autocapitalize="off" autocomplete="off" data-ign>
-              <small class="fld-note" data-ignnote aria-live="polite">${u.ign ? (u.verified ? "Checked by the staff." : "The staff haven't checked it yet. Changing it means they check again.") : "Your Minecraft name, so vote rewards reach you and players know who you are in game."}</small></label>
+              <small class="fld-note" data-ignnote aria-live="polite">${u.ign ? (u.verified ? "Proven. Changing it means proving it again." : health().link ? "Not proven yet. You can prove it below with a code." : "The staff haven't checked it yet. Changing it means they check again.") : "Your Minecraft name, so vote rewards reach you and players know who you are in game."}</small></label>
             <label class="fld"><span>Bio <small>500 characters, formatting works</small></span><textarea name="bio" rows="4" maxlength="500">${esc(pf.bio)}</textarea></label>
             <fieldset class="fld"><legend>Playstyle <small>pick up to three</small></legend><div class="tagpick">${Object.entries(TAG_NAMES).map(([k, l]) => `<label><input type="checkbox" name="tags" value="${k}"${pf.tags.includes(k) ? " checked" : ""}><span>${l}</span></label>`).join("")}</div></fieldset>
             <label class="fld"><span>Playing since</span><select name="since"><option value="">Not saying</option>${months.map(mo => `<option value="${mo}"${pf.since === mo ? " selected" : ""}>${new Date(mo + "-01T00:00:00Z").toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" })}</option>`).join("")}</select></label>
             ${errBox()}
             <p class="form-acts"><button class="btn btn-lava" type="submit">Save profile</button><a class="btn btn-line" href="${WC.userHref(u)}">View profile</a></p>
           </form>
+          ${health().link ? `<div class="card form prove" id="pprove" data-prove>
+            <h2>Prove my in-game name</h2>
+            ${u.verified && u.ign ? `<p class="acct-line"><b>${esc(u.ign)}</b><span class="chip chip-ok">Proven</span></p><p class="fine">Playing under another name now? Get a code and type it in the game under that name.</p>`
+              : `<p>Show that the name is really yours: get a code here, then type it in the game. If you lead a team in the game, you can then link it to your clan.</p>`}
+            <div data-provebox><p class="form-acts"><button type="button" class="btn btn-ink" data-getcode>Get a code</button></p></div>
+            ${errBox()}
+          </div>` : ""}
           <form class="card form" data-email id="pemail" novalidate><h2>Email</h2>
             ${a.email ? `<p class="acct-line"><b>${esc(a.email)}</b>${chip(a.emailVerified)}</p>${a.emailVerified ? "" : `<p class="fine">${a.verifySentAt === null ? "The link ran out or didn't go out." : "Open the link we sent to confirm it."}${resend("email")}</p>`}`
               : '<p class="mail-note">Add an email so you can get back in if you ever forget your password.</p>'}
@@ -2748,6 +2812,48 @@
     const keepDraft = () => { const f = $("[data-profile]", app); if (f) sess.set(draftKey, JSON.stringify(profileNow(f))); };
     on("input", "[data-profile] input, [data-profile] textarea", keepDraft);
     on("change", "[data-profile] select", keepDraft);
+    /* "Prove my in-game name": a code to type in the game. It is shown once, here, and the page then looks every few
+       seconds for the game's answer, so the player sees "Proven" without doing anything more on the site. */
+    let proveUntil = 0, proveBusy = false;
+    const proved = async () => {
+      if (!proveUntil || proveBusy || !$("[data-prove]", app)) return;
+      if (Date.now() > proveUntil) {
+        proveUntil = 0;
+        $("[data-provebox]", app).innerHTML = `<p class="mail-note">That code ran out. Get a new one when you're in the game.</p><p class="form-acts"><button type="button" class="btn btn-ink" data-getcode>Get a new code</button></p>`;
+        return;
+      }
+      proveBusy = true;
+      try {
+        const r = await api("/me");
+        const nu = r.user;
+        if (nu && nu.verified && nu.ign && (!u.verified || nu.ign !== u.ign)) {
+          proveUntil = 0;
+          // a profile draft from before must not put the old name back on Save
+          try { const dr = JSON.parse(sess.get(draftKey) || "null"); if (dr) { dr.ign = nu.ign; sess.set(draftKey, JSON.stringify(dr)); } } catch (e) { sess.set(draftKey, ""); }
+          WC.setSession(store.get("welloby.session"), nu);
+          toast(`Proven: you are ${nu.ign} in the game`);
+          route();
+        }
+      } catch (e) { /* the next look tries again */ }
+      finally { proveBusy = false; }
+    };
+    every(5000, proved);
+    on("click", "[data-getcode]", (e, b) => busy(b, async () => {
+      const card = b.closest("[data-prove]");
+      formErr(card, "");
+      try {
+        const r = await api("/me/link-code", { body: {} });
+        proveUntil = r.expires;
+        $("[data-provebox]", card).innerHTML = `<p class="prove-step">In the game, type:</p>
+          <p class="prove-code"><code data-code>/link ${esc(r.code)}</code></p>
+          <p class="fine">The code works once, for 10 minutes, and is shown only now. Your in-game name is taken from the game, spelled as it is there. This page notices by itself when it's done.</p>
+          <p class="form-acts"><button type="button" class="btn btn-line btn-s" data-provecheck>I've typed it</button><button type="button" class="link" data-getcode>Get a new code</button></p>`;
+      } catch (err) { formErr(card, err); }
+    }));
+    on("click", "[data-provecheck]", (e, b) => busy(b, async () => {
+      await proved();
+      if (proveUntil && $("[data-prove]", app)) toast("Not yet. Type the code in the game, then wait a moment.");
+    }));
     on("submit", "[data-profile]", (e, f) => busy($("button[type=submit]", f), async () => {
       formErr(f, "");
       try {

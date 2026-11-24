@@ -338,11 +338,36 @@ h1 .tr-flag .i{width:.5em;height:.5em;margin-right:.15em}
 .join-open{border-color:var(--ok);color:var(--ok)}
 .join-request{border-color:var(--lava);color:var(--lava-hot)}
 .join-closed{color:var(--ash)}
-.diplo{margin-bottom:90px}
+.diplo{margin-bottom:34px}
 .diplo .panel-h p{flex-basis:100%;font-size:14.5px}
 .diplo-map{position:relative;background:var(--ink);border:1px solid var(--stone);color:var(--bone)}
 .diplo-map svg{display:block;width:100%;height:auto;user-select:none}
 .diplo-map .cm-empty{border:0}
+/* teams made in the game: read only, under the clans on the Clans page */
+.teams{margin-bottom:90px}
+.teams .panel-h p{flex-basis:100%;font-size:14.5px}
+.teams code{font:500 13px/1.3 var(--mono);color:var(--bone)}
+.team-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:16px;margin-bottom:16px}
+.team{display:grid;gap:10px;align-content:start;padding:18px 18px 16px;background:var(--basalt);border:1px solid var(--stone);border-top:4px solid var(--stone);min-width:0}
+.team h3{font-size:clamp(22px,2vw,27px);line-height:1;overflow-wrap:anywhere}
+.team-meta{font-size:14px;color:var(--ash)}
+.team-meta b{color:var(--bone);font-weight:700;overflow-wrap:anywhere}
+.team-rows{display:grid;gap:8px;margin:0}
+.team-row{display:grid;gap:4px}
+.team-row dt{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ash)}
+.team-row dd{display:flex;flex-wrap:wrap;gap:6px;margin:0}
+.team-row .chip{margin-right:0;white-space:normal;overflow-wrap:anywhere}
+.team-upd,.teams-wait{font-size:13.5px}
+.team-clan{font-size:14px;color:var(--ash)}
+.team-clan a{color:var(--lava-hot);font-weight:700;overflow-wrap:anywhere}
+/* the linked team on a clan page, and "Prove my in-game name" in Settings */
+.clanteam{display:grid;gap:10px}
+.clanteam .panel-h{margin-bottom:4px}
+.clanteam-name{font-size:clamp(22px,2vw,27px);line-height:1;overflow-wrap:anywhere}
+.clanteam code,.prove code{font:500 13px/1.3 var(--mono)}
+.prove-step{font-weight:700}
+.prove-code{margin:0}
+.prove-code code{display:inline-block;max-width:100%;padding:12px 16px;font-size:clamp(20px,6vw,28px);letter-spacing:.08em;background:var(--ink);color:var(--bone);border:1px solid var(--stone);overflow-wrap:anywhere;user-select:all}
 .dl line{stroke-width:3;stroke-linecap:square}
 .dl-ally{stroke:#8fbf4a}
 .dl-war{stroke:#e2482d;stroke-dasharray:14 6;animation:march 1.1s linear infinite}

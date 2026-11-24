@@ -513,7 +513,7 @@
     if (u.role === "admin") b.push('<span class="bdg bdg-admin" title="Server admin">Admin</span>');
     else if (u.role === "mod") b.push('<span class="bdg bdg-mod" title="Moderator">Mod</span>');
     if (u.supporter) b.push(`<span class="bdg bdg-sup" title="Supports the server">${compact ? "\u2665" : "Supporter"}</span>`);
-    if (u.verified) b.push('<span class="bdg bdg-ver" title="Staff checked this is their in-game name">\u2713</span>');
+    if (u.verified) b.push('<span class="bdg bdg-ver" title="This in-game name is proven">\u2713</span>');
     return b.join("");
   }
   function who(u, size, opts = {}) {
