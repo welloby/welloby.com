@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://welloby.com/</loc><lastmod>2026-11-23</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://welloby.com/community</loc><lastmod>2026-11-23</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>
-  <url><loc>https://welloby.com/servers</loc><lastmod>2026-11-23</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>
-  <url><loc>https://welloby.com/map</loc><lastmod>2026-11-23</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://welloby.com/faq</loc><lastmod>2026-11-23</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://welloby.com/watch</loc><lastmod>2026-11-23</lastmod><changefreq>weekly</changefreq><priority>0.5</priority></url>
-  <url><loc>https://welloby.com/privacy</loc><lastmod>2026-11-23</lastmod><changefreq>yearly</changefreq></url>
-  <url><loc>https://welloby.com/terms</loc><lastmod>2026-11-23</lastmod><changefreq>yearly</changefreq></url>
-  <url><loc>https://welloby.com/llms.txt</loc><lastmod>2026-11-23</lastmod><changefreq>monthly</changefreq></url>
+  <url><loc>https://welloby.com/</loc><lastmod>2026-11-24</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://welloby.com/community</loc><lastmod>2026-11-24</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://welloby.com/servers</loc><lastmod>2026-11-24</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>
+  <url><loc>https://welloby.com/map</loc><lastmod>2026-11-24</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://welloby.com/faq</loc><lastmod>2026-11-24</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://welloby.com/watch</loc><lastmod>2026-11-24</lastmod><changefreq>weekly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://welloby.com/privacy</loc><lastmod>2026-11-24</lastmod><changefreq>yearly</changefreq></url>
+  <url><loc>https://welloby.com/terms</loc><lastmod>2026-11-24</lastmod><changefreq>yearly</changefreq></url>
+  <url><loc>https://welloby.com/llms.txt</loc><lastmod>2026-11-24</lastmod><changefreq>monthly</changefreq></url>
 </urlset>
