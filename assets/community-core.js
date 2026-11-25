@@ -72,7 +72,14 @@
   }
   async function refreshMe() {
     if (!token) { me = null; emit(); return null; }
-    try { const d = await api("/me"); me = d.user || null; if (!me) sessionEnded(); else emit(); }
+    try {
+      const d = await api("/me");
+      /* Only the API saying so ends a session. An answer with nothing in it says nothing: it is what arrives when the page
+         is already leaving for another one (community.html handing a server-list address on to servers.html), and
+         reading that as "signed out" threw the session away on about one such hand-over in thirty. */
+      if (!("user" in d)) return me;
+      me = d.user || null; if (!me) sessionEnded(); else emit();
+    }
     catch (e) { if (e.status === 401) setSession(null, null); }
     return me;
   }

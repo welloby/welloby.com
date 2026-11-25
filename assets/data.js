@@ -33,7 +33,7 @@ window.WELLOBY = {
  "donate": {
   "kofi": "https://ko-fi.com/welloby",
   "bmc": "https://buymeacoffee.com/welloby",
-  "bmcOn": false,
+  "bmcOn": true,
   "paypal": "",
   "stateUrl": "",
   "goal": 200,

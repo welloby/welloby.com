@@ -40,11 +40,12 @@
   const APP = (document.body.dataset && document.body.dataset.app) || "community";
   const START = (document.body.dataset && document.body.dataset.start) || "/";
   const HOME = "#" + START;
-  const SRV = /^\/(servers(\/new)?|s\/\d+(\/edit)?)\/?$/, ACCOUNT = /^\/(login|register|forgot|reset|verify|auth|welcome|undo-email)$/;
+  const SRV = /^\/(servers(\/new|\/why)?|s\/\d+(\/edit|\/vote)?)\/?$/, ACCOUNT = /^\/(login|register|forgot|reset|verify|auth|welcome|undo-email)$/;
   const isStaff = () => !!me() && me().role !== "player";
 
   /* ---------- views and events ---------- */
   let seq = 0, handlers = {}, timers = [];
+  let landAt = "";       // a page can name the part of itself to open on (the vote box, from a vote link)
   let onCounts = null;   // the open page's answer to new counts (a join request arriving while the clan page is open)
   addEventListener("welloby:counts", e => { if (onCounts) onCounts(e.detail || {}); });
   const on = (type, sel, fn) => { (handlers[type] = handlers[type] || []).push([sel, fn]); };
@@ -85,8 +86,9 @@
       "/players": "/players", "/u": "/players", "/messages": "/messages", "/supporters": "/supporters" };
   function setNav(path) {
     const top = "/" + (path.split("/")[1] || "");
-    // the map keys on the first part of the address, so "List your server" (#/servers/new) is picked out here
-    const cur = APP === "servers" && path.replace(/\/$/, "") === "/servers/new" ? "/servers/new" : NAV[top] || "";
+    // the map keys on the first part of the address, so "List your server" (#/servers/new) and "Why list here" are picked out here
+    const flat = path.replace(/\/$/, "");
+    const cur = APP === "servers" && (flat === "/servers/new" || flat === "/servers/why") ? flat : NAV[top] || "";
     for (const a of $$(".bar-nav a, .menu-list a")) {
       const h = a.getAttribute("href") || "";
       const on = !!cur && h === "#" + cur;
@@ -105,6 +107,7 @@
     const my = ++seq;
     handlers = {};
     onCounts = null;
+    landAt = "";
     timers.forEach(clearInterval); timers = [];
     // moving to another page is a good moment to look at the counts again (at most every 15 seconds)
     if (lastPath !== null && Date.now() - countsLooked > 15000) { countsLooked = Date.now(); WC.refreshCounts && WC.refreshCounts(); }
@@ -127,7 +130,8 @@
     catch (e) { if (my === seq) failed(e); }
     if (my !== seq) return;
     app.removeAttribute("aria-busy");
-    const target = (q.get("p") && document.getElementById("p" + q.get("p"))) || (/^[\w-]{1,40}$/.test(anchor) && document.getElementById(anchor));
+    const target = (q.get("p") && document.getElementById("p" + q.get("p"))) || (/^[\w-]{1,40}$/.test(anchor) && document.getElementById(anchor))
+      || (landAt && document.getElementById(landAt)) || null;
     if (target) { target.scrollIntoView({ block: anchor ? "start" : "center", behavior: reduced || !samePage ? "auto" : "smooth" }); target.classList.add("flash"); }
     else if (!samePage) scrollTo(0, 0);
     if (!samePage) {
@@ -1313,6 +1317,32 @@
   const REGION = { europe: "Europe", "north-america": "North America", "south-america": "South America", asia: "Asia", oceania: "Oceania", africa: "Africa", global: "Worldwide" };
   const EDITION = { java: "Java", bedrock: "Bedrock", both: "Java and Bedrock" };
   const javaAddr = s => (s.port === 25565 ? s.host : s.host + ":" + s.port);
+  /* the offline rule's days, from the API so every page states the same rule */
+  const listRule = () => Object.assign({ hideDays: 14, removeDays: 45 }, health().listRule || {});
+  /* an in-game name carried in a vote link (?name=) or handed on to the sign-up form: only a real-looking one counts */
+  const voteName = v => { const n = String(v || "").trim(); return IGN_OK.test(n) && !/ {2}/.test(n) ? n : ""; };
+  const SITE = String(W.siteUrl || "https://welloby.com/").replace(/\/*$/, "/");
+  const voteLink = s => `${SITE}servers#/s/${s.id}/vote`;
+  /* The vote badge: plain HTML with its own styles, so it looks the same on an owner's website as it does here and needs
+     no picture hosted anywhere. The owner copies exactly this. */
+  const badgeHtml = (name, href) => `<a href="${esc(href)}" target="_blank" rel="noopener" title="Vote for ${esc(name)} on Welloby" style="display:inline-flex;align-items:stretch;max-width:100%;background:#171614;color:#f3ecdb;border:2px solid #ff6a1f;font-family:'Barlow Condensed','Arial Narrow',Arial,sans-serif;font-weight:800;line-height:1.1;text-transform:uppercase;text-decoration:none"><span style="display:flex;align-items:center;padding:0 14px;background:#ff6a1f;color:#171614;font-size:18px">&#9650;</span><span style="display:block;padding:9px 18px 10px 14px"><span style="display:block;font-size:13px;letter-spacing:.14em;color:#a8a08f">Vote for</span><span style="display:block;font-size:24px;letter-spacing:.02em">${esc(name)}</span><span style="display:block;font-size:13px;letter-spacing:.14em;color:#a8a08f">on Welloby</span></span></a>`;
+  /* the same badge as a picture, for places that take pictures and no HTML (a Discord channel, a forum signature) */
+  async function badgePicture(name) {
+    const fam = '"Barlow Condensed","Arial Narrow",Arial,sans-serif', K = 3, H = 70, LEFT = 46, X = LEFT + 14;
+    try { if (document.fonts && document.fonts.load) await document.fonts.load('800 24px "Barlow Condensed"'); } catch (e) { /* the next font in the list draws it */ }
+    const cv = document.createElement("canvas"), g = cv.getContext && cv.getContext("2d");
+    if (!g || !g.measureText || !cv.toBlob) return null;
+    const lines = [["VOTE FOR", 13, "1.82px", "#a8a08f", 22], [name.toUpperCase(), 24, "0.48px", "#f3ecdb", 45], ["ON WELLOBY", 13, "1.82px", "#a8a08f", 60]];
+    const pen = ([, px, gap]) => { g.font = `800 ${px}px ${fam}`; try { g.letterSpacing = gap; } catch (e) { /* older browsers space it normally */ } };
+    const w = Math.ceil(X + Math.max(...lines.map(l => { pen(l); return g.measureText(l[0]).width; })) + 18);
+    cv.width = w * K; cv.height = H * K;
+    g.scale(K, K);
+    g.fillStyle = "#171614"; g.fillRect(0, 0, w, H);
+    g.fillStyle = "#ff6a1f"; g.fillRect(0, 0, LEFT, H); g.fillRect(0, 0, w, 2); g.fillRect(0, H - 2, w, 2); g.fillRect(w - 2, 0, 2, H);
+    g.fillStyle = "#171614"; g.beginPath(); g.moveTo(LEFT / 2, 26); g.lineTo(LEFT / 2 + 9, 43); g.lineTo(LEFT / 2 - 9, 43); g.closePath(); g.fill();
+    for (const l of lines) { pen(l); g.fillStyle = l[3]; g.fillText(l[0], X, l[4]); }
+    return new Promise(res => cv.toBlob(res, "image/png"));
+  }
   function srvIcon(s, size, cls) {
     const src = s.icon ? `${WC.API}/servers/${s.id}/icon?d=${Math.floor(((s.status && s.status.at) || 0) / 864e5)}` : WC.bannerURL(WC.randomBanner(WC.hash32(s.name)));
     return `<img class="sicon${s.icon ? "" : " sicon-gen"}${cls ? " " + cls : ""}" src="${src}" width="${size}" height="${size}" alt="" loading="lazy" decoding="async">`;
@@ -1369,10 +1399,11 @@
 
   page(/^\/servers\/?$/, async (m, q, stale) => {
     const sort = q.get("sort") || "votes", tag = q.get("tag") || "", term = q.get("q") || "", ed = q.get("edition") || "", pg = Number(q.get("page")) || 1;
-    const d = await api(`/servers?sort=${enc(sort)}&tag=${enc(tag)}&q=${enc(term)}&edition=${enc(ed)}&page=${pg}`);
+    const region = REGION[q.get("region")] ? q.get("region") : "";
+    const d = await api(`/servers?sort=${enc(sort)}&tag=${enc(tag)}&q=${enc(term)}&edition=${enc(ed)}&region=${enc(region)}&page=${pg}`);
     if (stale()) return;
     const link = over => {
-      const v = { q: term, tag, edition: ed, sort: sort === "votes" ? "" : sort, ...over }, p = new URLSearchParams();
+      const v = { q: term, tag, edition: ed, region, sort: sort === "votes" ? "" : sort, ...over }, p = new URLSearchParams();
       for (const [k, val] of Object.entries(v)) if (val) p.set(k, val);
       return "#/servers" + (p.toString() ? "?" + p : "");
     };
@@ -1389,7 +1420,7 @@
     show(`
       <section class="pagehead pagehead-servers"><div class="wrap">
         <h1>Server list</h1>
-        <p class="pagehead-lede">Find a Minecraft server to play on, or list your own for free. Servers are ranked by players' votes.</p>
+        <p class="pagehead-lede">Find a Minecraft server to play on, or list your own for free. Servers are ranked by players' votes. Run a server? <a href="#/servers/why">Why list it here</a>.</p>
         ${listIt}
       </div></section>
       <div class="wrap">
@@ -1397,32 +1428,61 @@
           <label class="sr-only" for="sq">Find a server</label><input id="sq" name="q" type="search" value="${esc(term)}" placeholder="Find a server by name or address" autocomplete="off">
           <label class="fld-inline"><span>Sort</span><select name="sort"><option value="votes">Votes in ${esc(monthName)}</option><option value="players"${sort === "players" ? " selected" : ""}>Players online</option><option value="new"${sort === "new" ? " selected" : ""}>Newest</option></select></label>
           <label class="fld-inline"><span>Edition</span><select name="edition"><option value="">Java and Bedrock</option><option value="java"${ed === "java" ? " selected" : ""}>Java</option><option value="bedrock"${ed === "bedrock" ? " selected" : ""}>Bedrock</option></select></label>
+          <label class="fld-inline"><span>Region</span><select name="region"><option value="">Anywhere</option>${(d.regions || Object.keys(REGION)).filter(r => REGION[r]).map(r => `<option value="${r}"${region === r ? " selected" : ""}>${esc(REGION[r])}</option>`).join("")}</select></label>
         </form>
         <nav class="tagbar" aria-label="Filter by tag"><a href="${link({ tag: "", page: "" })}"${!tag ? ' aria-current="true"' : ""}>All</a>${d.tags.map(t => `<a href="${link({ tag: t, page: "" })}"${tag === t ? ' aria-current="true"' : ""}>${esc(STAG[t] || t)}</a>`).join("")}</nav>
-        <div data-results aria-live="polite">${results(d, term || tag || ed, pageBase)}</div>
-        <p class="fine slist-note"><b>How the ranking works:</b> each player, and each network, can vote for a server once every 24 hours. The server with the most votes this month is at the top, and the votes start again on the 1st of each month. The \u2605 marks a featured server.</p>
+        <div data-results aria-live="polite">${results(d, term || tag || ed || region, pageBase)}</div>
+        <p class="fine slist-note"><b>How the ranking works:</b> each player, and each network, can vote for a server once every 24 hours. The server with the most votes this month is at the top, and the votes start again on the 1st of each month. The \u2605 marks a featured server. A server that has been offline for ${listRule().hideDays} days is left out until it answers again.</p>
       </div>`, "Server list");
-    const want = f => link({ q: f.q.value.trim(), sort: f.sort.value === "votes" ? "" : f.sort.value, edition: f.edition.value, page: "" });
+    const want = f => link({ q: f.q.value.trim(), sort: f.sort.value === "votes" ? "" : f.sort.value, edition: f.edition.value, region: f.region.value, page: "" });
     liveFilter("[data-sfilters]", want, async (f, my) => {
-      const p = new URLSearchParams(want(f).split("?")[1] || ""), x = { q: p.get("q") || "", sort: p.get("sort") || "votes", edition: p.get("edition") || "" };
-      const r = await api(`/servers?sort=${enc(x.sort)}&tag=${enc(tag)}&q=${enc(x.q)}&edition=${enc(x.edition)}&page=1`);
+      const p = new URLSearchParams(want(f).split("?")[1] || ""), x = { q: p.get("q") || "", sort: p.get("sort") || "votes", edition: p.get("edition") || "", region: p.get("region") || "" };
+      const r = await api(`/servers?sort=${enc(x.sort)}&tag=${enc(tag)}&q=${enc(x.q)}&edition=${enc(x.edition)}&region=${enc(x.region)}&page=1`);
       const base = want(f) + (want(f).includes("?") ? "&" : "?") + "page=";
-      if (my()) $("[data-results]", app).innerHTML = results(r, x.q || tag || x.edition, base);
+      if (my()) $("[data-results]", app).innerHTML = results(r, x.q || tag || x.edition || x.region, base);
     });
     on("click", "[data-vote]", (e, b) => castVote(b));
   });
 
-  page(/^\/s\/(\d+)\/?$/, async (m, q, stale) => {
+  /* #/s/12 is the server's page; #/s/12/vote is its vote link: the same page, opened on the vote box, and
+     #/s/12/vote?name=Steve also says whose vote it is */
+  page(/^\/s\/(\d+)(\/vote)?\/?$/, async (m, q, stale) => {
     const d = await api("/servers/" + m[1]);
     if (stale()) return;
-    renderServer(d);
+    renderServer(d, { vote: !!m[2], name: m[2] ? voteName(q.get("name")) : "" });
   });
   /* a failed vote hand-off in words a server owner can act on (the raw error is for the logs) */
   const votifierWhy = (host, port) => `It didn't arrive. Couldn't reach the vote listener at ${host}:${port || 8192}. Check the address, the port and that the vote listener is running.`;
-  function renderServer(d) {
+  function renderServer(d, opt = {}) {
     const s = d.server, my = d.my, st = s.status, mg = d.manage;
     const addr = s.edition === "bedrock" ? s.host : javaAddr(s);
     const voted = my.nextVoteAt && my.nextVoteAt > Date.now(), byNet = voted && my.votedBy === "network";
+    if (opt.vote) landAt = "vote";
+    /* a vote link with a name: a visitor is told whose vote it will be, and both ways in come back to this link (a new
+       account starts with that in-game name); a member whose account plays under another name is told the vote is theirs */
+    const asName = opt.name || "", mine = my.signedIn ? me() : null;
+    const back = enc(`#/s/${s.id}/vote${asName ? "?name=" + enc(asName) : ""}`);
+    const sameName = !!mine && String(mine.ign || "").toLowerCase() === asName.toLowerCase();
+    const forName = !asName ? "" : !mine ? `Voting as <b>${esc(asName)}</b>? <a href="#/login?next=${back}">Sign in</a> or <a href="#/register?next=${back}&ign=${enc(asName)}">create a free account</a> to vote. One vote a day.`
+      : sameName ? "" : mine.ign ? `The vote counts for <b>${esc(mine.name)}</b> (in game <b>${esc(mine.ign)}</b>), not for ${esc(asName)}.`
+      : `The vote counts for <b>${esc(mine.name)}</b>. To get vote rewards in game as ${esc(asName)}, <a href="community.html#/settings">add your in-game name in Settings</a>.`;
+    const rule = listRule(), off = mg && mg.offline;
+    const day = t => new Date(t).toLocaleDateString("en-US", { month: "long", day: "numeric" });
+    /* what the owner is told while the server doesn't answer: nothing for a restart or a bad evening, then the dates */
+    const offNote = !off ? "" : s.away ? `<p class="fine snote"><b>Off the list for now.</b> ${esc(s.name)} has not answered since ${day(off.since)}. The listing comes back by itself as soon as the server answers again. If it stays offline, the listing is removed on ${day(off.removeAt)}.</p>`
+      : Date.now() - off.since > 2 * 864e5 ? `<p class="fine snote"><b>Your server is not answering.</b> We have not reached it since ${day(off.since)}. If that goes on, the listing leaves the list on ${day(off.hideAt)} and comes back by itself when the server answers.</p>` : "";
+    /* the owner's kit for getting votes: the badge (as code and as a picture) and the vote link */
+    const link = voteLink(s);
+    const voteKit = my.canManage ? `<section class="panel votekit" data-votekit>
+        <header class="panel-h"><h2>Get more votes</h2></header>
+        <p class="fine">Put the badge on your website and the link in your Discord or behind a <code>/vote</code> command. Both open this page with the Vote button in view.</p>
+        <div class="votekit-show" aria-label="The badge as it will look">${badgeHtml(s.name, link).replace(' target="_blank" rel="noopener"', ' tabindex="-1"')}</div>
+        <p class="form-acts"><button type="button" class="btn btn-lava btn-s" data-copy="${esc(badgeHtml(s.name, link))}" data-copy-label="the badge code" data-copy-where="Paste it into your website's HTML.">${icon("i-copy")}Copy the badge code</button><button type="button" class="btn btn-line btn-s" data-badgepng>Save the badge as a picture</button></p>
+        <dl class="votekit-links">
+          <div><dt>Vote link</dt><dd><button type="button" class="addr" data-copy="${esc(link)}" data-copy-label="the vote link" title="Copy the vote link">${icon("i-copy")}${esc(link)}</button></dd></div>
+          <div><dt>With a name</dt><dd><button type="button" class="addr" data-copy="${esc(link)}?name=" data-copy-label="the vote link" data-copy-where="Put the player's in-game name after name=" title="Copy the vote link with name=">${icon("i-copy")}<span>${esc(link)}?name=<i>PlayerName</i></span></button>
+            <small>Put the player's in-game name at the end. The page then says whose vote it is, and a new account starts with that name filled in.</small></dd></div>
+        </dl></section>` : "";
     const canClaim = my.signedIn && !my.owner;
     const verifyPanel = (my.owner && !s.verified) || canClaim ? `<section class="panel" data-verifypanel>
         <header class="panel-h"><h2>${my.owner ? "Verify your server" : "Is this your server?"}</h2></header>
@@ -1465,6 +1525,7 @@
             </div>
             <ul class="clanfacts">
               <li class="slive">${liveBits(s)}</li>
+              ${st && !st.online && s.seen ? `<li class="muted">Last seen online ${when(s.seen)}</li>` : ""}
               ${s.version ? `<li>${esc(s.version)}</li>` : st && st.version ? `<li>${esc(st.version)}</li>` : ""}
               <li>${esc(EDITION[s.edition] || s.edition)}</li>
               ${s.region ? `<li>${esc(REGION[s.region] || s.region)}</li>` : ""}
@@ -1472,22 +1533,25 @@
               ${s.featured ? '<li class="join join-request">Featured</li>' : ""}
             </ul>
           </div>
-          <div class="svote">
+          <div class="svote" id="vote">
             <p class="svote-rank">#${d.rank}<small>this month</small></p>
             <p class="svote-n"><b data-vcount>${fmt(s.votes.month)}</b> <span data-vword>${s.votes.month === 1 ? "vote" : "votes"}</span> this month<small data-vtotal>${fmt(s.votes.total)} in total</small></p>
             <button type="button" class="btn btn-lava btn-l${voted ? " voted" : ""}" data-vote="${s.id}"${voted ? " disabled" : ""}>${voted ? "Voted" : `${icon("i-heart")}Vote`}</button>
             <p class="fine" data-vnote>${byNet ? `Someone on your network already voted for this server today. One vote per network a day. Try again in ${plural(Math.max(1, Math.ceil((my.nextVoteAt - Date.now()) / 36e5)), "hour")}.`
               : voted ? `You can vote again in ${plural(Math.max(1, Math.ceil((my.nextVoteAt - Date.now()) / 36e5)), "hour")}.`
+              : forName ? forName
               : my.signedIn ? `The vote counts for <b>${esc(me().name)}</b>${s.votifier ? " and pays out in game." : "."}` : "Sign in to vote. One vote a day."}</p>
           </div>
         </div>
       </section>
       <div class="wrap clanbody">
         <div class="clanmain">
+          ${s.away ? `<p class="snotice">${esc(s.name)} has not answered for ${rule.hideDays} days, so it is off the list for now. It comes back by itself when it answers again.</p>` : ""}
           <section class="panel"><header class="panel-h"><h2>About</h2>${s.tags.length ? `<span>${s.tags.map(t => `<a class="chip" href="#/servers?tag=${enc(t)}">${esc(STAG[t] || t)}</a>`).join("")}</span>` : ""}</header>
             <div class="post-body">${s.about ? format(s.about) : '<p class="muted">The owner hasn\u2019t written a description yet.</p>'}</div></section>
           ${st && st.motd ? `<section class="panel"><header class="panel-h"><h2>Message of the day</h2></header><p class="motd">${esc(st.motd)}</p></section>` : ""}
           ${votifierPanel}
+          ${voteKit}
         </div>
         <aside class="clanside">
           <section class="panel"><header class="panel-h"><h2>Details</h2></header>
@@ -1501,13 +1565,24 @@
           </section>
           ${my.canManage ? `<section class="panel panel-hot"><header class="panel-h"><h2>${my.owner ? "Your listing" : "Staff"}</h2></header>
             <p class="form-acts"><a class="btn btn-lava btn-s" href="#/s/${s.id}/edit">${icon("i-edit")}Edit</a><button type="button" class="btn btn-line btn-s btn-danger" data-sdelete>Remove listing</button></p>
-            ${s.hidden ? '<p class="fine">Hidden from the list by the staff.</p>' : ""}</section>` : ""}
+            ${s.hidden ? '<p class="fine">Hidden from the list by the staff.</p>' : ""}${offNote}</section>` : ""}
           ${verifyPanel}
           ${!my.owner ? '<p class="sreport"><button type="button" class="link" data-sreport>Report this listing</button></p>' : ""}
         </aside>
       </div>`, s.name);
     const reload = () => route();
+    // from a vote link the keyboard starts on the Vote button
+    if (opt.vote) { const vb = $("[data-vote]", app); if (vb && !vb.disabled && vb.focus) vb.focus({ preventScroll: true }); }
     on("click", "[data-vote]", (e, b) => castVote(b));
+    on("click", "[data-badgepng]", (e, b) => busy(b, async () => {
+      const blob = await badgePicture(s.name).catch(() => null);
+      if (!blob) { toast("This browser can't make the picture. Copy the badge code instead."); return; }
+      const a = document.createElement("a"), url = URL.createObjectURL(blob);
+      a.href = url; a.download = `vote-${s.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "server"}-on-welloby.png`;
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      toast("Saved the badge. Wherever you post it, link it to your vote link.");
+    }));
     on("click", "[data-vstart]", (e, b) => busy(b, async () => {
       try { await api(`/servers/${s.id}/verify`, { body: {} }); reload(); } catch (err) { formErr(b.closest("[data-verifypanel]"), err); }
     }));
@@ -1549,6 +1624,33 @@
     }));
   }
 
+  /* For server owners: what listing here gives them, in eight points. The wording is the owner's to approve; it names no
+     plugin, host or software ("vote listener"), and the offline rule's days come from the API. */
+  page(/^\/servers\/why\/?$/, async () => {
+    const r = listRule();
+    const points = [
+      ["Free. No paid ranks, ever", "Listing is free, and so is everything else on the list. Nobody can pay for a higher place, a sponsored spot or extra votes. The \u2605 marks a server the staff chose to feature, and it is never sold."],
+      ["Cracked and anarchy servers welcome", "Offline-mode servers, anarchy servers and small survival servers are as welcome as any other. Java, Bedrock or both."],
+      ["Prove it is yours with a code in the MOTD", "Put a short code in your server's MOTD, press Check, then take it out again. Your listing gets a check mark. If someone else listed your server first, the listing moves to you, votes included."],
+      ["Vote rewards, with a test button", "If your server has a vote listener (the kind vote sites use, set up with a token), enter its port and token and press Send a test vote. From then on every vote reaches your server with the voter's in-game name, and your reward plugin hands out the reward."],
+      ["A voter's network address is never passed on", "Your server gets the voter's in-game name and nothing else about them. We never pass a voter's network address to a listed server."],
+      ["How the ranking works", "Each player, and each network, can vote for a server once every 24 hours. The server with the most votes this month is at the top, and the votes start again on the 1st of each month, so a new server can win a month. Voters sign in with a free account, which makes fake votes harder."],
+      ["A badge and a vote link, ready to paste", "Your listing comes with a \u201cVote for us\u201d badge for your website and a vote link for your Discord or a /vote command. The link opens your page with the Vote button in view."],
+      ["What gets a listing removed", `Listing a server that is not yours or does not exist, a misleading name or description, links to scams or adult content, and cheating on votes. Players can report a listing, and the staff decide. A server that stays offline for ${r.hideDays} days leaves the list until it answers again; after ${r.removeDays} days offline the listing is removed.`],
+    ];
+    const acts = me() ? `<a class="btn btn-lava btn-l" href="#/servers/new">${icon("i-plus")}List your server</a>`
+      : `<a class="btn btn-lava btn-l" href="#/register?next=%23%2Fservers%2Fnew">Create an account and list it</a><a class="btn btn-line btn-l" href="#/login?next=%23%2Fservers%2Fnew">Sign in</a>`;
+    show(`
+      <section class="pagehead"><div class="wrap">${crumbs([["#/servers", "Server list"], [null, "For server owners"]])}
+        <h1>Why list here</h1>
+        <p class="pagehead-lede">A free list where players' votes decide the order. Listing takes about a minute.</p></div></section>
+      <div class="wrap">
+        <ol class="why" data-stagger>${points.map(([h, p]) => `<li><h2>${h}</h2><p>${p}</p></li>`).join("")}</ol>
+        <p class="form-acts why-acts">${acts}</p>
+        <p class="fine why-fine">You need a free Welloby account. One account can list up to three servers. Questions? <a href="${esc(health().discord || "https://discord.gg/cwHKDtXQWD")}" target="_blank" rel="noopener">Ask on Discord</a>.</p>
+      </div>`, "Why list here");
+  });
+
   page(/^\/servers\/new$|^\/s\/(\d+)\/edit$/, async (m, q, stale) => {
     const editing = !!m[1];
     const u = me();
@@ -1565,7 +1667,7 @@
     show(`
       <section class="pagehead"><div class="wrap">${crumbs(editing ? [["#/servers", "Server list"], ["#/s/" + s.id, s.name], [null, "Edit"]] : [["#/servers", "Server list"], [null, "List your server"]])}
         <h1>${editing ? "Edit " + esc(s.name) : "List your server"}</h1>
-        <p class="pagehead-lede">${editing ? "Changing the address takes the verified mark away until you verify again." : "It goes on the list straight away. Verify it afterwards to get a check mark and vote rewards. You can list up to three servers."}</p></div></section>
+        <p class="pagehead-lede">${editing ? "Changing the address takes the verified mark away until you verify again." : 'It goes on the list straight away. Verify it afterwards to get a check mark and vote rewards. You can list up to three servers. <a href="#/servers/why">Why list here</a>'}</p></div></section>
       <div class="wrap narrow">
         <form class="card form sform" data-sform novalidate>
           <label class="fld"><span>Server name</span><input name="name" maxlength="40" minlength="3" required value="${esc(v.name)}"></label>
@@ -2142,7 +2244,7 @@
     if (stale()) return;
     const pct = d.goal ? Math.min(100, (d.month.total / d.goal) * 100) : 0;
     const monthName = new Date(d.month.start).toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
-    // Buy Me a Coffee stays hidden until config.json's donate.bmcOn says its page can take money (its payout step isn't done)
+    // Buy Me a Coffee shows only while config.json's donate.bmcOn is true (its page can take money)
     // The Google Play app (the head script marks it "in-app"): Play's rules don't allow links to outside payment or asking
     // for tips there, so the app shows the wall and the hearts only: no tip buttons, no money goal, no "how to tip".
     const inApp = document.documentElement.classList.contains("in-app");
@@ -2165,13 +2267,13 @@
         </div>
       </section>
       <div class="wrap supgrid">
-        <section class="panel"><header class="panel-h"><h2>The wall</h2><span class="muted">${plural(d.all.count, "tip")} since the start</span></header>
+        <section class="panel"><header class="panel-h"><h2>The wall</h2>${inApp ? "" : `<span class="muted">${plural(d.all.count, "tip")} since the start</span>`}</header>
           ${d.supporters.length ? `<ul class="wall" data-stagger>${d.supporters.map(s => `<li class="tip glow">
             <div class="tip-who">${s.user ? `<a href="${WC.userHref(s.user)}">${head(s.user, 40)}</a>` : '<i class="hd hd-anon" style="width:40px;height:40px"></i>'}<div><b>${s.user ? `<a href="${WC.userHref(s.user)}">${esc(s.name)}</a>` : esc(s.name)}</b><small>${money(s.amount, s.currency)} \u00b7 ${ago(s.at)}</small></div></div>
             ${s.message ? `<q>${esc(s.message)}</q>` : ""}</li>`).join("")}</ul>` : empty(inApp ? "No supporters yet." : "No tips yet. You could be first.")}
         </section>
         <aside class="panel"><header class="panel-h"><h2>Top supporters</h2></header>
-          ${d.top.length ? `<ol class="rank rank-sup">${d.top.map((s, i) => `<li>${s.user ? `<a href="${WC.userHref(s.user)}">` : "<span>"}<i class="rk">${i + 1}</i>${s.user ? head(s.user, 30) : '<i class="hd hd-anon"></i>'}<span><b>${esc(s.name)}</b><small>${money(s.amount)} \u00b7 ${plural(s.count, "tip")}</small></span>${s.user ? "</a>" : "</span>"}</li>`).join("")}</ol>` : '<p class="muted">Nobody yet.</p>'}
+          ${d.top.length ? `<ol class="rank rank-sup">${d.top.map((s, i) => `<li>${s.user ? `<a href="${WC.userHref(s.user)}">` : "<span>"}<i class="rk">${i + 1}</i>${s.user ? head(s.user, 30) : '<i class="hd hd-anon"></i>'}<span><b>${esc(s.name)}</b><small>${money(s.amount)}${inApp ? "" : " \u00b7 " + plural(s.count, "tip")}</small></span>${s.user ? "</a>" : "</span>"}</li>`).join("")}</ol>` : '<p class="muted">Nobody yet.</p>'}
         </aside>
       </div>`, "Supporters", () => countUp(app));
   });
@@ -2379,7 +2481,7 @@
             ${nickField("")}
             <label class="fld"><span>Email <small>Gmail or any address. Only for getting back in, never shown to anyone</small></span>
               <input name="email" type="email" inputmode="email" autocomplete="email" required maxlength="254" spellcheck="false" autocapitalize="off"></label>
-            ${ignField("")}
+            ${ignField(voteName(q.get("ign")))}
             ${newPwFields("Password <small>at least 8 characters, not your in-game one</small>", "Type the password again")}
             <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
             ${site ? '<div class="ts" data-ts></div>' : ""}
@@ -2986,14 +3088,14 @@
       if (stale()) return;
       body = `${admin ? `<div class="grid2">
         <form class="card form" data-goal><h2>Monthly goal</h2><label class="fld"><span>Dollars</span><input name="goal" type="number" min="1" max="1000000" value="${d.goal}"></label>${errBox()}<p class="form-acts"><button class="btn btn-ink" type="submit">Save goal</button></p></form>
-        <form class="card form" data-addsup><h2>Add a tip by hand</h2><p class="fine">${document.documentElement.classList.contains("in-app") ? "For tips that were not recorded by themselves." : "For tips that didn't come through Ko-fi or Buy Me a Coffee."}</p>
+        <form class="card form" data-addsup><h2>${document.documentElement.classList.contains("in-app") ? "Add a supporter by hand" : "Add a tip by hand"}</h2><p class="fine">${document.documentElement.classList.contains("in-app") ? "For supporters who were not recorded by themselves." : "For tips that didn't come through Ko-fi or Buy Me a Coffee."}</p>
           <div class="grid2"><label class="fld"><span>Name shown</span><input name="name" required maxlength="60"></label><label class="fld"><span>Amount</span><input name="amount" type="number" min="0.01" step="0.01" required></label></div>
           <div class="grid2"><label class="fld"><span>Link to player <small>optional</small></span><input name="user" maxlength="17"></label><label class="fld"><span>Date <small>optional</small></span><input name="date" type="date"></label></div>
           <label class="fld"><span>Message <small>optional</small></span><input name="message" maxlength="500"></label>
           <label class="check"><input type="checkbox" name="public" checked><span>Show name and message publicly</span></label>${errBox()}
           <p class="form-acts"><button class="btn btn-lava" type="submit">Add</button></p></form></div>` : ""}
         <ul class="asups">${d.supporters.map(s => `<li class="card" data-sid="${s.id}"><div><b>${esc(s.name)}</b>${s.public ? "" : ' <span class="chip">private</span>'}<small>${money(s.amount, s.currency)} \u00b7 ${esc(s.source)} \u00b7 ${ago(s.at)}${s.user ? ` \u00b7 linked to <a href="#/u/${enc(s.user)}">${esc(s.user)}</a>` : ""}</small>${s.message ? `<q>${esc(s.message)}</q>` : ""}</div>
-          ${admin ? `<div class="au-acts"><button type="button" class="link" data-link>${s.user ? "Change link" : "Link to player"}</button><button type="button" class="link danger" data-delsup>Remove</button></div>` : ""}</li>`).join("") || "<li class='muted'>No tips recorded yet.</li>"}</ul>`;
+          ${admin ? `<div class="au-acts"><button type="button" class="link" data-link>${s.user ? "Change link" : "Link to player"}</button><button type="button" class="link danger" data-delsup>Remove</button></div>` : ""}</li>`).join("") || `<li class='muted'>${document.documentElement.classList.contains("in-app") ? "No supporters recorded yet." : "No tips recorded yet."}</li>`}</ul>`;
     } else if (tab === "servers") {
       const d = await api("/admin/servers");
       if (stale()) return;
@@ -3004,7 +3106,7 @@
         <h2 class="staff-h">Listed servers</h2>
         <p class="fine">Hidden servers stay reachable by their link but drop off the list. Only admins can feature a server; featured ones sit at the top.</p>
         <ul class="ausers asrv">${d.servers.map(s => `<li class="card${s.hidden ? " is-banned" : ""}" data-srv="${s.id}">
-          <div class="au-id">${srvIcon(s, 36)}<div><a href="#/s/${s.id}"><b>${esc(s.name)}</b></a>${s.verified ? '<span class="bdg bdg-ver" title="Verified owner">\u2713</span>' : ""}${s.featured ? '<span class="chip chip-feat">Featured</span>' : ""}
+          <div class="au-id">${srvIcon(s, 36)}<div><a href="#/s/${s.id}"><b>${esc(s.name)}</b></a>${s.verified ? '<span class="bdg bdg-ver" title="Verified owner">\u2713</span>' : ""}${s.featured ? '<span class="chip chip-feat">Featured</span>' : ""}${s.away ? '<span class="chip">Offline, off the list</span>' : ""}
             <small>${esc(s.edition === "bedrock" ? s.host : javaAddr(s))} \u00b7 ${plural(s.votes.month, "vote")} this month \u00b7 ${s.owner ? "by " + esc(s.owner.name) : "no owner"} \u00b7 listed ${ago(s.created)}${s.hidden ? ' \u00b7 <b class="war">hidden</b>' : ""}</small></div></div>
           <div class="au-acts">
             ${admin ? `<button type="button" class="link" data-sact="${s.featured ? "unfeature" : "feature"}">${s.featured ? "Unfeature" : "Feature"}</button>` : ""}
@@ -3132,6 +3234,7 @@
       { g: "Community", t: "Find a player", s: "Everyone who signed up", k: "players profile user search", run: () => go("#/players") },
       { g: "Community", t: "Server list", s: "Find a server and vote once a day", k: "servers server list vote voting", run: () => go("#/servers") },
       { g: "Community", t: "List your server", s: "List it, verify it, reward voters", k: "add server list my server votifier", run: () => go("#/servers/new") },
+      { g: "Community", t: "Why list here", s: "For server owners: free, ranked by votes, vote rewards", k: "owner owners why list server badge vote link ranking", run: () => go("#/servers/why") },
       { g: "Community", t: "Search the forum", s: "Threads and posts", k: "search forum find", run: () => go("#/search") },
       { g: "Community", t: "Your settings", s: "Profile, email, password, sign-in methods", k: "settings profile account password email recovery google discord facebook", run: () => go("#/settings") },
     ]));
