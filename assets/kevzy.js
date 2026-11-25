@@ -256,9 +256,20 @@
     var it = top.it;
     return { id: it.id, score: top.score, text: pick(it.a), act: it.act || [], next: it.next || [], auto: it.auto };
   }
+  /* The Google Play app (the head script marks the page "in-app"): Play's rules don't allow links to outside payment or
+     asking for tips there. An answer with an "app" part in kevzy-kb.js uses that wording and those buttons instead, and
+     no answer keeps a button that leads to the Donate box or to a tip site. The website itself is unchanged. */
+  var PAY = /^donate$|^go:#donate\b|^(url|page):.*(#donate\b|ko-fi\.com|buymeacoffee\.com|paypal\.)/i;
+  function forApp(r) {
+    var it = KB.filter(function (x) { return x.id === r.id; })[0], app = it && it.app, out = {};
+    for (var k in r) out[k] = r[k];
+    if (app) { out.text = app.a[0]; out.act = app.act || []; if (app.next) out.next = app.next; }
+    out.act = (out.act || []).filter(function (a) { return !PAY.test(a[1]); });
+    return out;
+  }
   function fill(s, vars) { return String(s).replace(/\{(\w+)\}/g, function (m, k) { return vars && vars[k] != null ? vars[k] : m; }); }
 
-  G.kevzyEngine = { ask: ask, rank: rank, tokens: tokens, fill: fill, smart: smart, realLife: realLife, size: KB.length };
+  G.kevzyEngine = { ask: ask, rank: rank, tokens: tokens, fill: fill, smart: smart, realLife: realLife, forApp: forApp, size: KB.length };
   if (typeof document === "undefined") return;
 
   /* ---------------- widget ---------------- */
@@ -382,6 +393,7 @@
   }
   function reply(text) {
     var v = vars(), r = ask(text, v);
+    if (document.documentElement.classList.contains("in-app")) r = forApp(r);
     var typing = bubble("bot kz-typing", '<span class="kz-dots" aria-label="' + NAME + ' is typing"><i></i><i></i><i></i></span>');
     busy = true;
     var wait = reduced ? 120 : Math.min(1100, 320 + fill(r.text, v).length * 9);

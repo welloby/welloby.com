@@ -74,7 +74,9 @@
     if (L[k]) items.push({ g: "Follow", t: "Welloby on " + label, s: L[k].replace(/^https?:\/\/(www\.)?/, ""), k: "follow social " + k + " " + label, run: open1(L[k]) });
   });
   (W.creators || []).forEach(c => (c.links || []).forEach(l => items.push({ g: "Follow", t: c.name + " on " + (SOCIAL[l.platform] || l.platform), s: c.about || "", k: "creator streamer video " + c.name + " " + (c.clan || "") + " " + l.platform, run: open1(l.url) })));
-  $$(".menu-list a, .menu-more a").forEach(a => items.push({ g: "Go to", t: a.textContent.trim(), s: "", k: "section page", run: () => {
+  /* in the Google Play app the Donate link is hidden (site.css), so search doesn't offer it either */
+  const inApp = document.documentElement.classList.contains("in-app");
+  $$(".menu-list a, .menu-more a").filter(a => !(inApp && /#donate\b/.test(a.getAttribute("href") || ""))).forEach(a => items.push({ g: "Go to", t: a.textContent.trim(), s: "", k: "section page", run: () => {
     const h = a.getAttribute("href") || "";
     if (h.startsWith("#") && !h.startsWith("#/") && document.getElementById(h.slice(1))) go(h.slice(1))();
     else location.href = a.href;

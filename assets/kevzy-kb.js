@@ -2,6 +2,8 @@
    {ip} {bedrock} {port} {discord} {x} {name} {days} {kofi} are filled in at runtime.
    act: [label, action]   action = copy:TEXT | go:#id | map:open|spawn | roll | goto:X,Z | game:guessr|elytra
                                    | url:LINK | page:LINK | donate | ask:QUESTION | planner:BLOCKS | contact
+   app: { a: [...], act: [...] }   what the Google Play app says instead: Play's rules don't allow links to outside
+                                   payment or asking for tips there (kevzy.js, forApp). The website uses a and act.
    url: opens another site in a new tab; page: opens a page of this site in the same tab, so the Home Screen app
    doesn't throw the player out into a browser with no way back.
    next: follow-up questions shown as chips. */
@@ -268,7 +270,8 @@ window.KEVZY_KB = [
     a: ["no ranks, no kits, no perks. everyone plays the same game."], next: ["is it pay to win"] },
   { id: "p2w", q: ["is it pay to win", "p2w", "pay to win", "can you buy stuff"],
     k: ["p2w"],
-    a: ["no. nothing is for sale, and tips don't buy perks or advantages. everyone plays the same game."], act: [["How donations work", "go:#donate"]] },
+    a: ["no. nothing is for sale, and tips don't buy perks or advantages. everyone plays the same game."], act: [["How donations work", "go:#donate"]],
+    app: { a: ["no. nothing is for sale. everyone plays the same game."] } },
   { id: "op", q: ["can i get op", "op", "creative", "gamemode creative", "admin perms", "give me op", "fly command", "can i be admin"],
     k: ["op", "creative", "gamemode", "admin"],
     a: ["no op, no creative, no fly command. survival for everyone."] },
@@ -363,10 +366,12 @@ window.KEVZY_KB = [
   { id: "donate", q: ["how can i donate", "donate", "donation", "support the server", "how to support", "help pay for the server", "kofi", "ko-fi", "paypal", "buy me a coffee", "tip"],
     k: ["donate", "donation", "donations", "support", "kofi", "paypal", "tip", "coffee"],
     a: ["thanks for asking. tips go through ko-fi and help pay for hosting and upkeep. they're optional and don't buy perks or advantages. in game, `/donate` shows the link and this month's goal."],
-    act: [["Donate on Ko-fi", "donate"], ["See the goal", "go:#donate"]] },
+    act: [["Donate on Ko-fi", "donate"], ["See the goal", "go:#donate"]],
+    app: { a: ["thanks for asking. there's nothing to pay for in this app: welloby is free and sells nothing. you can help by voting once a day or by bringing a friend."], act: [["Vote on welloby.com", "page:community.html#/s/1"]] } },
   { id: "donate_perks", q: ["do i get a rank if i donate", "donor rank", "do donors get perks", "do donors get anything", "donation perks", "what do i get for donating", "donator rewards"],
     k: ["perks", "rewards", "donor", "donator"],
     act: [["Donate on Ko-fi", "donate"], ["How donations work", "go:#donate"]],
+    app: { a: ["no perks. nothing on welloby is for sale, that's mojang's rule and ours, and it keeps the server fair."] },
     a: ["no perks. tips don't buy anything only you can use, that's mojang's rule and ours, and it keeps the server fair. you can leave a message with your tip on ko-fi."] },
   { id: "contact", q: ["how do i contact you", "contact", "email", "contact the owner", "talk to an admin", "business inquiry", "who do i message"],
     k: ["contact", "email", "message", "admin", "owner"],
@@ -462,7 +467,8 @@ window.KEVZY_KB = [
   { id: "supporters", q: ["supporter wall", "supporter heart", "how do i get the heart", "what is the heart on profiles", "supporters page"],
     k: ["supporter", "supporters", "heart"],
     a: ["tip on ko-fi with your in-game name in the message and you get a heart on the supporter wall and your profile. it can take a while to show up. it's a thank-you, not a perk."],
-    act: [["Supporter wall", "page:community.html#/supporters"], ["Donate on Ko-fi", "donate"]] },
+    act: [["Supporter wall", "page:community.html#/supporters"], ["Donate on Ko-fi", "donate"]],
+    app: { a: ["the heart on the supporter wall and on profiles is a thank-you to people who helped keep the server running. it's not a perk."], act: [["Supporter wall", "page:community.html#/supporters"]] } },
   { id: "game_broken", q: ["is the game broken", "the game is not working", "game not loading", "spawn guessr not working", "spawn guessr wont load", "elytra dive not working", "the map wont load", "3d map not loading", "the game is stuck", "game stuck on loading the 3d map", "the website is not working"],
     k: ["loading", "stuck"],
     a: ["spawn guessr and the 3D map can take up to a minute to load on mobile data. wait a bit, then reload the page. elytra dive works without the map. in elytra dive, hold to climb and let go to dive. still not working? tell us on discord."],
@@ -532,11 +538,13 @@ window.KEVZY_KB = [
   { id: "help", q: ["help", "what can you do", "what can i ask", "menu", "options", "commands", "what do you know"],
     k: ["help", "options", "menu"],
     a: ["ask about joining, rules, hacks, money, teleports, the nether or donating, or about this website: accounts, clans, messages, notifications and the server list. i also do maths, convert nether coords, work out travel times and start the games."],
-    next: ["how do i join", "how do i join a clan", "nether 800 -1200", "play a game"] },
+    next: ["how do i join", "how do i join a clan", "nether 800 -1200", "play a game"],
+    app: { a: ["ask about joining, rules, hacks, money, teleports or the nether, or about this website: accounts, clans, messages, notifications and the server list. i also do maths, convert nether coords, work out travel times and start the games."] } },
   { id: "commands", q: ["what commands are there", "command list", "list of commands", "useful commands"],
     k: ["command", "commands"],
     a: ["the useful ones: `/sethome` `/home` `/tpa` `/lfg` `/coords` `/jobs` `/vote` `/bal` `/pay` `/baltop` `/donate` `/kill`. no /rtp, /spawn or /back."],
-    act: [["Commands table", "go:#world"]] },
+    act: [["Commands table", "go:#world"]],
+    app: { a: ["the useful ones: `/sethome` `/home` `/tpa` `/lfg` `/coords` `/jobs` `/vote` `/bal` `/pay` `/baltop` `/kill`. no /rtp, /spawn or /back."], act: [["Commands table", "go:#world"]] } },
   { id: "thanks", q: ["thanks", "thank you", "ty", "thx", "appreciate it", "tysm", "cheers"],
     k: ["thanks", "thank", "ty", "thx", "tysm", "cheers"],
     a: ["np.", "anytime. see you out there."] },

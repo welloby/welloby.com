@@ -1061,3 +1061,9 @@ body:has(.chatpage) :is(.bar-sub,.local){display:none}
   .pagehead-lede{margin-top:6px;font-size:15px}
   .pagehead .search{margin-top:12px}
 }
+
+/* Touch screens and "reduce motion": keep the header map still.
+   Its endless zoom held the community page at about 20 frames a second in the Android app test (60 without it). */
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .mast-bg, .authbg { animation: none; }
+}

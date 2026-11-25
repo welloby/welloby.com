@@ -1270,3 +1270,9 @@ html:has(.menu[open]) .toast{top:auto;bottom:calc(12px + env(safe-area-inset-bot
   .bf-links a{display:inline-flex;align-items:center;min-height:44px;padding-inline:10px}
   .mapx-foot a,.sec-lede a,.spawnline a,.ru a{display:inline-block;padding-block:12px;margin-block:-12px}
 }
+
+/* The Google Play app (the head script marks it "in-app"): no links to outside payment and no asking for tips there
+   (Play's Payments policy). The website itself keeps all of it. Vote then has its row to itself. */
+.in-app [data-tipjar], .in-app a[href*="#donate"], .in-app li:has(> a[href*="#donate"]), .in-app a[href*="ko-fi.com"],
+.in-app a[href*="paypal."], .in-app a[href*="buymeacoffee.com"] { display: none !important; }
+.in-app .support { grid-template-columns: 1fr; }

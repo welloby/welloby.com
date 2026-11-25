@@ -2143,7 +2143,10 @@
     const pct = d.goal ? Math.min(100, (d.month.total / d.goal) * 100) : 0;
     const monthName = new Date(d.month.start).toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
     // Buy Me a Coffee stays hidden until config.json's donate.bmcOn says its page can take money (its payout step isn't done)
-    const links = [["Ko-fi", DONATE.kofi], ["Buy Me a Coffee", DONATE.bmcOn === true && DONATE.bmc], ["PayPal", DONATE.paypal]].filter(x => x[1]);
+    // The Google Play app (the head script marks it "in-app"): Play's rules don't allow links to outside payment or asking
+    // for tips there, so the app shows the wall and the hearts only: no tip buttons, no money goal, no "how to tip".
+    const inApp = document.documentElement.classList.contains("in-app");
+    const links = inApp ? [] : [["Ko-fi", DONATE.kofi], ["Buy Me a Coffee", DONATE.bmcOn === true && DONATE.bmc], ["PayPal", DONATE.paypal]].filter(x => x[1]);
     const auto = !!(WC.health() || {}).kofi || !!(WC.health() || {}).bmc;
     show(`
       <section class="mast mast-sup">
@@ -2151,20 +2154,21 @@
         <div class="wrap mast-in">
           <p class="kicker">The people who keep the lights on</p>
           <h1>Supporters</h1>
-          <p class="mast-lede">Welloby is free and sells nothing. Tips pay for hosting, upkeep and development, and they buy no perks or advantages in game. Supporters get a heart next to their name here, nothing more.</p>
-          <div class="bigoal">
+          <p class="mast-lede">${inApp ? "Welloby is free and sells nothing. Supporters have a heart next to their name here, nothing more: no perks or advantages in game."
+            : "Welloby is free and sells nothing. Tips pay for hosting, upkeep and development, and they buy no perks or advantages in game. Supporters get a heart next to their name here, nothing more."}</p>
+          ${inApp ? "" : `<div class="bigoal">
             <p><b>${money(d.month.total)}</b><span>of ${money(d.goal)} in ${esc(monthName)}${d.month.count ? `, from ${plural(d.month.count, "supporter")}` : ""}</span></p>
             <div class="bigoal-track" role="progressbar" aria-label="${esc(monthName)} goal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}"><i style="--p:${pct.toFixed(1)}%"></i>${[25, 50, 75].map(s => `<em style="left:${s}%"></em>`).join("")}</div>
           </div>
           <p class="mast-acts">${links.map(([n, href], i) => `<a class="btn ${i ? "btn-line" : "btn-lava"} btn-l" href="${esc(href)}" target="_blank" rel="noopener" data-tip>${icon("i-heart")}${esc(n)}${icon("i-ext")}</a>`).join("")}</p>
-          <p class="fine">Payments go through ${links.map(l => l[0]).join(" or ") || "the tip page"}, so this site never sees your card. ${auto ? "Use your in-game name when you tip and you get the supporter heart by itself." : "Use your in-game name when you tip, and the staff add your supporter heart by hand."}</p>
+          <p class="fine">Payments go through ${links.map(l => l[0]).join(" or ") || "the tip page"}, so this site never sees your card. ${auto ? "Use your in-game name when you tip and you get the supporter heart by itself." : "Use your in-game name when you tip, and the staff add your supporter heart by hand."}</p>`}
         </div>
       </section>
       <div class="wrap supgrid">
         <section class="panel"><header class="panel-h"><h2>The wall</h2><span class="muted">${plural(d.all.count, "tip")} since the start</span></header>
           ${d.supporters.length ? `<ul class="wall" data-stagger>${d.supporters.map(s => `<li class="tip glow">
             <div class="tip-who">${s.user ? `<a href="${WC.userHref(s.user)}">${head(s.user, 40)}</a>` : '<i class="hd hd-anon" style="width:40px;height:40px"></i>'}<div><b>${s.user ? `<a href="${WC.userHref(s.user)}">${esc(s.name)}</a>` : esc(s.name)}</b><small>${money(s.amount, s.currency)} \u00b7 ${ago(s.at)}</small></div></div>
-            ${s.message ? `<q>${esc(s.message)}</q>` : ""}</li>`).join("")}</ul>` : empty("No tips yet. You could be first.")}
+            ${s.message ? `<q>${esc(s.message)}</q>` : ""}</li>`).join("")}</ul>` : empty(inApp ? "No supporters yet." : "No tips yet. You could be first.")}
         </section>
         <aside class="panel"><header class="panel-h"><h2>Top supporters</h2></header>
           ${d.top.length ? `<ol class="rank rank-sup">${d.top.map((s, i) => `<li>${s.user ? `<a href="${WC.userHref(s.user)}">` : "<span>"}<i class="rk">${i + 1}</i>${s.user ? head(s.user, 30) : '<i class="hd hd-anon"></i>'}<span><b>${esc(s.name)}</b><small>${money(s.amount)} \u00b7 ${plural(s.count, "tip")}</small></span>${s.user ? "</a>" : "</span>"}</li>`).join("")}</ol>` : '<p class="muted">Nobody yet.</p>'}
@@ -2982,7 +2986,7 @@
       if (stale()) return;
       body = `${admin ? `<div class="grid2">
         <form class="card form" data-goal><h2>Monthly goal</h2><label class="fld"><span>Dollars</span><input name="goal" type="number" min="1" max="1000000" value="${d.goal}"></label>${errBox()}<p class="form-acts"><button class="btn btn-ink" type="submit">Save goal</button></p></form>
-        <form class="card form" data-addsup><h2>Add a tip by hand</h2><p class="fine">For tips that didn't come through Ko-fi or Buy Me a Coffee.</p>
+        <form class="card form" data-addsup><h2>Add a tip by hand</h2><p class="fine">${document.documentElement.classList.contains("in-app") ? "For tips that were not recorded by themselves." : "For tips that didn't come through Ko-fi or Buy Me a Coffee."}</p>
           <div class="grid2"><label class="fld"><span>Name shown</span><input name="name" required maxlength="60"></label><label class="fld"><span>Amount</span><input name="amount" type="number" min="0.01" step="0.01" required></label></div>
           <div class="grid2"><label class="fld"><span>Link to player <small>optional</small></span><input name="user" maxlength="17"></label><label class="fld"><span>Date <small>optional</small></span><input name="date" type="date"></label></div>
           <label class="fld"><span>Message <small>optional</small></span><input name="message" maxlength="500"></label>
