@@ -1,12 +1,19 @@
-/* kevzy: the site's help bot. Matches questions against assets/kevzy-kb.js entirely in the browser:
-   no AI service, nothing typed leaves the page. The engine also runs under Node for tests. */
+/* kevzy: the site's help bot. Matches questions against assets/kevzy-kb.js entirely in the browser, with no AI service.
+   While the site's "listen" switch is off (config.json), nothing typed leaves the page. While it is on, two things go
+   to the staff desk so the answers can get better, both without a name or an account: a Yes or No under an answer
+   (the topic only), and a question it had no answer to (the question only). The engine also runs under Node for tests. */
 (function () {
   "use strict";
   var G = typeof window !== "undefined" ? window : globalThis;
   var W = G.WELLOBY || {};
   /* need: "map3d" answers exist only once the site has a 3D map address, need: "!map3d" ones only until then */
   var HAS3D = !!(W.map3d && W.map3d.url);
-  var KB = (G.KEVZY_KB || []).filter(function (it) { return !it.need || (it.need === "map3d" ? HAS3D : it.need === "!map3d" ? !HAS3D : true); });
+  /* need: "listen" answers exist only while the site's "listen" switch is on (config.json: Send feedback, "Did this help?",
+     unanswered questions going to the staff), need: "!listen" ones only while it is off */
+  var LISTEN = W.listen === true;
+  var KB = (G.KEVZY_KB || []).filter(function (it) {
+    return !it.need || (it.need === "map3d" ? HAS3D : it.need === "!map3d" ? !HAS3D : it.need === "listen" ? LISTEN : it.need === "!listen" ? !LISTEN : true);
+  });
 
   /* ---------------- text handling ---------------- */
   var SYN = {
@@ -390,6 +397,37 @@
     else if (kind === "game") { go("#games"); if (Gm) Gm.open(arg); }
     else if (kind === "planner") { go("#planner"); if (P) P.set(Number(arg)); }
     else if (kind === "ask") send(arg);
+    else if (kind === "feedback") { if (LISTEN && window.WC && window.WC.feedback) window.WC.feedback(); else go("#contact"); }
+  }
+  /* ---- listening: what goes to the staff desk. No account and no sign-in code is sent with it; a failed send is silent. ---- */
+  var SMALLTALK = { hello: 1, how_are_you: 1, who: 1, bot: 1, same_kevzy: 1, help: 1, thanks: 1, bye: 1, laugh: 1, joke: 1, fact: 1, insult: 1,
+    compliment: 1, kevzy_age: 1, yes: 1, no: 1, roll: 1, real_life: 1 };
+  var told = {};
+  function tell(data) {
+    var key = data.question ? "q:" + data.question.toLowerCase() : "t:" + data.topic;
+    if (!LISTEN || told[key] || W.preview) return;
+    told[key] = 1;
+    data.app = document.documentElement.classList.contains("in-app");
+    try {
+      var base = String((W.community && W.community.api) || "/api").replace(/\/+$/, "");
+      fetch(base + "/feedback/bot", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data), credentials: "omit", cache: "no-store", keepalive: true })
+        .catch(function () { /* the staff just don't hear this one */ });
+    } catch (e) { /* no fetch here */ }
+  }
+  /* "Did this help?" under a real answer (not small talk, not "not sure what you mean"), once per topic per visit */
+  function helped(row, id) {
+    if (!LISTEN || SMALLTALK[id] || told["t:" + id]) return;
+    var wrap = document.createElement("div");
+    wrap.className = "kz-help";
+    wrap.innerHTML = '<span>Did this help?</span><button type="button" class="kz-yn" data-yn="1">Yes</button><button type="button" class="kz-yn" data-yn="0">No</button>';
+    wrap.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-yn]");
+      if (!b) return;
+      var yes = b.getAttribute("data-yn") === "1";
+      tell({ topic: id, helped: yes });
+      wrap.innerHTML = "<span>" + (yes ? "Good. Thanks." : "Thanks. The staff will see that this answer missed.") + "</span>";
+    });
+    row.append(wrap); scrollLog();
   }
   function reply(text) {
     var v = vars(), r = ask(text, v);
@@ -401,6 +439,8 @@
       typing.remove();
       var row = bubble("bot", rich(fill(r.text, v)));
       actions(row, r.act, v);
+      if (r.id === "fallback") tell({ question: String(text).replace(/\s+/g, " ").trim().slice(0, 200) });
+      else helped(row, r.id);
       chips(r.next);
       busy = false;
       if (r.auto === "roll") run("roll");

@@ -29,6 +29,7 @@ window.WELLOBY = {
   "name": "kevzy",
   "nudge": true
  },
+ "listen": false,
  "mapStart": "2026-09-06",
  "donate": {
   "kofi": "https://ko-fi.com/welloby",

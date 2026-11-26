@@ -1747,11 +1747,13 @@
     const d = await api(`/users?sort=${enc(sort)}&q=${enc(term)}&page=${pg}`);
     if (stale()) return;
     const base = p => "#/players?" + new URLSearchParams({ ...(term ? { q: term } : {}), ...(sort !== "new" ? { sort } : {}), page: p });
-    const people = (x, b) => (x.users.length ? `<ul class="plist" data-stagger>${x.users.map(playerCard).join("")}</ul>` : empty("Nobody by that name."))
-      + (x.pages > 1 ? `<nav class="pager" aria-label="Pages">${Array.from({ length: x.pages }, (y, i) => i + 1).map(n => n === x.page ? `<span aria-current="page">${n}</span>` : `<a href="${b(n)}">${n}</a>`).join("")}</nav>` : "");
+    // No total and no page numbers: how many website accounts there are is never shown (the owner's rule). The list only
+    // knows whether more players follow, so it has Previous and Next.
+    const people = (x, b) => (x.users.length ? `<ul class="plist" data-stagger>${x.users.map(playerCard).join("")}</ul>` : empty(x.page > 1 ? "No more players." : "Nobody by that name."))
+      + (x.page > 1 || x.more ? `<nav class="pager" aria-label="Pages">${x.page > 1 ? `<a href="${b(x.page - 1)}" rel="prev">Previous</a>` : ""}<span aria-current="page">Page ${fmt(x.page)}</span>${x.more ? `<a href="${b(x.page + 1)}" rel="next">Next</a>` : ""}</nav>` : "");
     show(`
       <section class="pagehead"><div class="wrap"><p class="kicker">Everyone who signed up</p><h1>Players</h1>
-        <p class="pagehead-lede">${plural(d.total, "player")}.</p></div></section>
+        <p class="pagehead-lede">Find a player by nickname or in-game name.</p></div></section>
       <div class="wrap">
         <form class="filters" data-filters>
           <label class="sr-only" for="pq">Find a player</label><input id="pq" name="q" type="search" value="${esc(term)}" placeholder="Find a player" autocomplete="off">
@@ -2246,7 +2248,8 @@
     const monthName = new Date(d.month.start).toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
     // Buy Me a Coffee shows only while config.json's donate.bmcOn is true (its page can take money)
     // The Google Play app (the head script marks it "in-app"): Play's rules don't allow links to outside payment or asking
-    // for tips there, so the app shows the wall and the hearts only: no tip buttons, no money goal, no "how to tip".
+    // for tips there, so the app shows the wall and the hearts only: no tip buttons, no money goal, no "how to tip",
+    // and no amounts next to the names (the owner's decision, 26 Nov 2026).
     const inApp = document.documentElement.classList.contains("in-app");
     const links = inApp ? [] : [["Ko-fi", DONATE.kofi], ["Buy Me a Coffee", DONATE.bmcOn === true && DONATE.bmc], ["PayPal", DONATE.paypal]].filter(x => x[1]);
     const auto = !!(WC.health() || {}).kofi || !!(WC.health() || {}).bmc;
@@ -2269,11 +2272,11 @@
       <div class="wrap supgrid">
         <section class="panel"><header class="panel-h"><h2>The wall</h2>${inApp ? "" : `<span class="muted">${plural(d.all.count, "tip")} since the start</span>`}</header>
           ${d.supporters.length ? `<ul class="wall" data-stagger>${d.supporters.map(s => `<li class="tip glow">
-            <div class="tip-who">${s.user ? `<a href="${WC.userHref(s.user)}">${head(s.user, 40)}</a>` : '<i class="hd hd-anon" style="width:40px;height:40px"></i>'}<div><b>${s.user ? `<a href="${WC.userHref(s.user)}">${esc(s.name)}</a>` : esc(s.name)}</b><small>${money(s.amount, s.currency)} \u00b7 ${ago(s.at)}</small></div></div>
+            <div class="tip-who">${s.user ? `<a href="${WC.userHref(s.user)}">${head(s.user, 40)}</a>` : '<i class="hd hd-anon" style="width:40px;height:40px"></i>'}<div><b>${s.user ? `<a href="${WC.userHref(s.user)}">${esc(s.name)}</a>` : esc(s.name)}</b><small>${inApp ? "" : money(s.amount, s.currency) + " \u00b7 "}${ago(s.at)}</small></div></div>
             ${s.message ? `<q>${esc(s.message)}</q>` : ""}</li>`).join("")}</ul>` : empty(inApp ? "No supporters yet." : "No tips yet. You could be first.")}
         </section>
         <aside class="panel"><header class="panel-h"><h2>Top supporters</h2></header>
-          ${d.top.length ? `<ol class="rank rank-sup">${d.top.map((s, i) => `<li>${s.user ? `<a href="${WC.userHref(s.user)}">` : "<span>"}<i class="rk">${i + 1}</i>${s.user ? head(s.user, 30) : '<i class="hd hd-anon"></i>'}<span><b>${esc(s.name)}</b><small>${money(s.amount)}${inApp ? "" : " \u00b7 " + plural(s.count, "tip")}</small></span>${s.user ? "</a>" : "</span>"}</li>`).join("")}</ol>` : '<p class="muted">Nobody yet.</p>'}
+          ${d.top.length ? `<ol class="rank rank-sup">${d.top.map((s, i) => `<li>${s.user ? `<a href="${WC.userHref(s.user)}">` : "<span>"}<i class="rk">${i + 1}</i>${s.user ? head(s.user, 30) : '<i class="hd hd-anon"></i>'}<span><b>${esc(s.name)}</b>${inApp ? "" : `<small>${money(s.amount)} \u00b7 ${plural(s.count, "tip")}</small>`}</span>${s.user ? "</a>" : "</span>"}</li>`).join("")}</ol>` : '<p class="muted">Nobody yet.</p>'}
         </aside>
       </div>`, "Supporters", () => countUp(app));
   });
@@ -3031,7 +3034,9 @@
     if (!u || u.role === "player") { show(`<section class="pagehead"><div class="wrap"><h1>Staff desk</h1></div></section><div class="wrap narrow">${empty("This page is for the server staff.")}</div>`, "Staff desk"); return; }
     const tab = m[1] || "reports", admin = u.role === "admin";
     const RANK = { player: 1, mod: 2, admin: 3 }, above = p => (RANK[u.role] || 0) > (RANK[p && p.role] || 1);   // the API only lets staff ban players below them
-    const tabs = [["reports", "Reports"], ["players", "Players"], ["servers", "Servers"], ["supporters", "Supporters"], ["log", "Log"]];
+    // Feedback only while the site's "listen" switch is on (config.json): with it off nothing is sent, so there is nothing to show
+    const listen = (window.WELLOBY || {}).listen === true;
+    const tabs = [["reports", "Reports"], ["players", "Players"], ["servers", "Servers"], ["supporters", "Supporters"], ...(listen ? [["feedback", "Feedback"]] : []), ["log", "Log"]];
     const dots = { reports: (u.reports || 0) - (u.serverReports || 0), servers: u.serverReports || 0 };
     let body = "";
     if (tab === "reports") {
@@ -3113,6 +3118,35 @@
             <button type="button" class="link" data-sact="${s.verified ? "unverify" : "verify"}">${s.verified ? "Take the check mark away" : "Mark as verified"}</button>
             <button type="button" class="link${s.hidden ? "" : " danger"}" data-sact="${s.hidden ? "unhide" : "hide"}">${s.hidden ? "Show on the list" : "Hide from the list"}</button>
           </div></li>`).join("") || "<li class='muted'>No servers listed yet.</li>"}</ul>`;
+    } else if (tab === "feedback" && listen) {
+      /* What people told the staff, and a few private counts. Staff only: no public page and no public API answer has any of it. */
+      const [d, ov] = await Promise.all([api("/admin/feedback"), api("/admin/overview").catch(() => null)]);
+      if (stale()) return;
+      const w = ov && ov.watch, of = (a, b) => `${fmt(a)} of ${fmt(b)}`;
+      const watch = w ? `<h2 class="staff-h">How it's going</h2>
+        <p class="fine">Counted from the community's own database, for the staff only. None of it is on a public page.</p>
+        <div class="au-over" data-watch>
+          <p><b>${fmt(w.votes.today)}</b><small>votes today \u00b7 ${fmt(w.votes.yesterday)} yesterday</small></p>
+          <p><b>${fmt(w.accounts.new7)}</b><small>new account${w.accounts.new7 === 1 ? "" : "s"} in 7 days</small></p>
+          <p><b>${of(w.accounts.back1, w.accounts.cohort)}</b><small>came back after a day (accounts made 7 to 37 days ago)</small></p>
+          <p><b>${of(w.accounts.back7, w.accounts.cohort)}</b><small>came back after a week</small></p>
+          <p><b>${of(w.accounts.did, w.accounts.cohort)}</b><small>posted, voted, joined a clan or proved a name</small></p>
+          <p><b>${fmt(w.servers.listed)}</b><small>server${w.servers.listed === 1 ? "" : "s"} on the list \u00b7 ${fmt(w.servers.proven)} proven \u00b7 ${fmt(w.servers.new7)} new in 7 days</small></p>
+          <p><b>${fmt(w.servers.away)}</b><small>off the list for being offline \u00b7 ${fmt(w.servers.hidden)} hidden</small></p>
+          <p class="${w.reports ? "bad" : ""}"><b>${fmt(w.reports)}</b><small>open reports</small></p>
+          <p><b>${fmt(w.push)}</b><small>players with notifications on</small></p>
+          <p><b>${fmt(w.feedback.botYes)} yes \u00b7 ${fmt(w.feedback.botNo)} no</b><small>"Did this help?" in 30 days</small></p></div>` : "";
+      const notes = `<h2 class="staff-h">Notes from "Send feedback"</h2><p class="fine">Sent without a name or an account. Kept for ${fmt(d.keepDays)} days, then deleted.</p>`
+        + (d.notes.length ? `<ul class="reports">${d.notes.map(n => `<li class="card${n.done ? " is-done" : ""}" data-fb="${n.id}">
+          <p class="rep-top"><b>${n.done ? "Done" : "Open"}</b><small>${ago(n.at)}${n.page ? " \u00b7 from " + esc(n.page) : ""}${n.app ? " \u00b7 in the app" : ""}</small></p>
+          <div class="post-body fb-text">${esc(n.text).replace(/\n/g, "<br>")}</div>
+          ${n.contact ? `<p class="fine">Reach them: <b>${esc(n.contact)}</b></p>` : ""}
+          <p class="form-acts"><button type="button" class="btn btn-line btn-s" data-fbact="${n.done ? "open" : "done"}">${n.done ? "Open again" : "Mark done"}</button><button type="button" class="btn btn-line btn-s btn-danger" data-fbact="delete">Delete</button></p></li>`).join("")}</ul>` : '<p class="muted">No notes yet.</p>');
+      const bot = `<h2 class="staff-h">Help bot: did the answer help?</h2>`
+        + (d.bot.length ? `<table class="log"><thead><tr><th>Answer</th><th>Yes</th><th>No</th></tr></thead><tbody>${d.bot.map(b => `<tr><td>${esc(b.topic)}</td><td>${fmt(b.yes)}</td><td>${fmt(b.no)}</td></tr>`).join("")}</tbody></table>` : '<p class="muted">Nobody has answered yet.</p>');
+      const asks = `<h2 class="staff-h">Questions the help bot couldn't answer</h2><p class="fine">The question only, with no name. Remove one once the bot knows the answer.</p>`
+        + (d.asks.length ? `<ul class="asups">${d.asks.map(a => `<li class="card" data-fbq="${esc(a.text)}"><div><b>${esc(a.text)}</b><small>${plural(a.count, "time")} \u00b7 last ${ago(a.last)}</small></div><div class="au-acts"><button type="button" class="link" data-fbqdel>Remove</button></div></li>`).join("")}</ul>` : '<p class="muted">None yet.</p>');
+      body = watch + notes + bot + asks;
     } else if (tab === "log") {
       const d = await api("/admin/log");
       if (stale()) return;
@@ -3132,6 +3166,14 @@
         await api(`/admin/server-reports/${li.dataset.srep}`, { body: {} });
         toast("Hidden from the list, and the report is closed"); await WC.refreshMe(); route();
       } catch (err) { toast(err.message); }
+    }));
+    on("click", "[data-fbact]", (e, b) => busy(b, async () => {
+      const act = b.dataset.fbact;
+      try { await api(`/admin/feedback/${b.closest("[data-fb]").dataset.fb}`, { body: { action: act } }); toast(act === "delete" ? "Note deleted" : act === "done" ? "Marked done" : "Open again"); route(); }
+      catch (err) { toast(err.message); }
+    }));
+    on("click", "[data-fbqdel]", (e, b) => busy(b, async () => {
+      try { await api("/admin/feedback-asks", { body: { text: b.closest("[data-fbq]").dataset.fbq } }); toast("Removed"); route(); } catch (err) { toast(err.message); }
     }));
     on("click", "[data-banauthor]", (e, b) => {
       const out = $("[data-out]", b.closest("li"));

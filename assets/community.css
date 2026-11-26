@@ -38,7 +38,7 @@ a:hover>.bnr img,.ccard:hover .bnr img{animation-duration:2.2s}
 /* ---------- the Community section on the main page ---------- */
 .community-sec{position:relative;padding:clamp(56px,7vw,100px) 0 clamp(90px,10vw,140px)}
 .community-sec::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(60% 50% at 80% 0,rgba(255,106,31,.1),transparent 70%),radial-gradient(50% 40% at 0 100%,rgba(127,174,58,.06),transparent 70%)}
-.cmt-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px;align-self:end;min-width:min(440px,100%)}
+.cmt-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;align-self:end;min-width:min(360px,100%)}
 .cmt-stats div{padding:12px 14px;background:var(--basalt)}
 .cmt-stats b{display:block;font:800 clamp(28px,2.8vw,40px)/1 var(--display);color:var(--bone)}
 .cmt-stats span{font-size:13px;color:var(--ash);font-weight:600}
@@ -545,6 +545,19 @@ h1 .tr-flag .i{width:.5em;height:.5em;margin-right:.15em}
 .terms-gate a{font-weight:700;color:var(--ember);text-underline-offset:3px}
 .terms-gate-acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 .terms-gate .btn-line{color:var(--ink);border-color:var(--ink)}
+/* Send feedback: the same box as the terms, with two fields */
+.fb-box h2{font-size:clamp(28px,3.6vw,40px)}
+.fb-fld{display:block;margin-top:14px}
+.fb-fld span{display:block;margin-bottom:6px;font-weight:700;font-size:15px}
+.fb-fld textarea,.fb-fld input{display:block;width:100%;padding:10px 12px;border:2px solid var(--ink);border-radius:0;background:#fffdf6;color:var(--ink);font:400 16px/1.45 var(--body, inherit)}
+.fb-fld textarea{min-height:120px;resize:vertical}
+.fb-fld textarea:focus-visible,.fb-fld input:focus-visible{outline:3px solid var(--ember);outline-offset:1px}
+.fb-box .fb-fine{margin-top:12px;font-size:14px;line-height:1.5;opacity:.85}
+.fb-box .fb-err{margin-top:10px;font-weight:700;font-size:15px;color:#a3200b}
+.fb-box .terms-gate-acts{margin-top:16px}
+/* the staff desk's Feedback tab */
+.staff .is-done{opacity:.62}
+.staff .fb-text{overflow-wrap:anywhere}
 /* the notice for visitors who aren't signed in (termsBar in community-core.js): between the back-to-top
    button on the left and Ask kevzy on the right, and above both on a phone */
 /* sign-in with Google, Discord, Facebook: each in its own colours, as their guidelines ask */
@@ -965,7 +978,7 @@ body:has(.chatpage) :is(.bar-sub,.local){display:none}
   .wait-item{grid-template-columns:auto minmax(0,1fr)}
   .wait-acts{grid-column:1/-1}
   .wait-acts .btn{flex:1 1 auto;justify-content:center}
-  .stats,.cmt-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .pagehead .wrap{grid-template-columns:1fr}
   .pagehead .pagehead-act{grid-column:1;grid-row:auto;justify-self:start;margin-top:18px}
   .msgs-start{grid-template-columns:1fr}

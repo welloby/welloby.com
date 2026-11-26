@@ -360,6 +360,10 @@ html.game-on .kz,html.gs-on .kz-launch,html.gs-on .kz-nudge{display:none}
 .kz-act{display:inline-flex;align-items:center;min-height:32px;padding:5px 11px;border:1px solid var(--lava);color:var(--lava-hot);font-weight:700;font-size:13.5px;text-decoration:none}
 .kz-act:hover{background:var(--lava);color:var(--ink)}
 .kz-act:focus-visible{outline-offset:2px}
+/* "Did this help?" under an answer */
+.kz-help{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px;font-size:13px;color:var(--ash)}
+.kz-yn{min-height:32px;min-width:44px;padding:4px 10px;border:1px solid var(--stone);font-weight:700;font-size:13px;color:rgba(243,236,219,.88)}
+.kz-yn:hover{border-color:var(--ash);color:var(--bone)}
 .kz-chips{display:flex;flex-wrap:wrap;gap:6px;padding-left:2px}
 .kz-chip{min-height:32px;padding:5px 11px;border:1px solid var(--stone);font-size:13.5px;color:rgba(243,236,219,.88);text-align:left}
 .kz-chip:hover{border-color:var(--ash);color:var(--bone)}

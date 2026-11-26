@@ -709,7 +709,8 @@
     let d;
     try { d = await api("/hub"); } catch (e) { return; }
     const st = d.stats || {};
-    $("[data-cm-stats]", teaser).innerHTML = [["players", "members"], ["clans", "clans"], ["threads", "threads"], ["posts", "posts"]]
+    // clans, threads and posts: how many website accounts there are is never shown (the owner's rule), and the API doesn't send it
+    $("[data-cm-stats]", teaser).innerHTML = [["clans", "clans"], ["threads", "threads"], ["posts", "posts"]]
       .map(([k, label]) => `<div><b>${fmt(st[k])}</b><span>${label}</span></div>`).join("");
     $("[data-cm-clans]", teaser).innerHTML = (d.clans || []).slice(0, 5).map((c, i) =>
       `<li><a href="${clanHref(c)}"><i class="rk">${i + 1}</i>${banner(c.banner, "bnr-xs")}<span><b>${esc(c.name)}</b><small>[${esc(c.tag)}] \u00b7 ${plural(c.members, "member")}</small></span></a></li>`).join("")
@@ -730,6 +731,60 @@
   }
   fillTeaser();
 
+  /* ---------- Send feedback ----------
+     A link in every footer and in the menu. Two fields: what happened, and a contact for people who want an answer.
+     It goes to the staff desk with the page it was sent from. No account goes with it, even from a signed-in player
+     (the request carries no sign-in code), and it is never public. */
+  function feedback() {
+    if (W.listen !== true || $("[data-fb-box]")) return;   // the site's "listen" switch (config.json): off means no form anywhere
+    const d = document.createElement("dialog");
+    if (typeof d.showModal !== "function") { location.href = (W.links && W.links.discord) || "index.html#contact"; return; }
+    d.className = "terms-gate fb-box notch";
+    d.setAttribute("data-fb-box", "");
+    d.setAttribute("aria-labelledby", "fb-title");
+    d.innerHTML = `<p class="kicker">To the staff \u00b7 not public</p>
+      <h2 id="fb-title">Send feedback</h2>
+      <form class="fb-form" novalidate>
+        <label class="fb-fld"><span>What happened, or what should be better?</span><textarea name="text" rows="5" maxlength="1000" required></textarea></label>
+        <label class="fb-fld"><span>How to reach you (optional)</span><input name="contact" type="text" maxlength="120" autocomplete="off" placeholder="Discord name or email"></label>
+        <p class="fb-fine">Sent without your name or account. Add a contact only if you want an answer. Don't write passwords or personal details here. Notes are deleted after 90 days.</p>
+        <p class="fb-err" role="alert" hidden></p>
+        <div class="terms-gate-acts"><button class="btn btn-lava" type="submit">Send</button><button class="btn btn-line" type="button" data-fb-x>Cancel</button></div>
+      </form>`;
+    const f = $("form", d), err = $(".fb-err", d);
+    const say = t => { err.textContent = t; err.hidden = !t; };
+    $("[data-fb-x]", d).addEventListener("click", () => d.close());
+    d.addEventListener("close", () => d.remove());
+    f.addEventListener("submit", async e => {
+      e.preventDefault();
+      const text = f.text.value.trim();
+      if ([...text].length < 5) { say("Write a few words first."); f.text.focus(); return; }
+      const btn = $("[type=submit]", f);
+      btn.disabled = true; say("");
+      try {
+        const res = await fetch(API + "/feedback", {
+          method: "POST", headers: { accept: "application/json", "content-type": "application/json" }, cache: "no-store", credentials: "omit",
+          body: JSON.stringify({ text, contact: f.contact.value.trim(), page: (location.pathname.split("/").pop() || "index.html") + location.hash.split("?")[0],
+            app: document.documentElement.classList.contains("in-app") }),
+        });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error((data && data.error) || "That didn't go through. Try again.");
+        d.close();
+        toast("Sent. Thank you, the staff will read it.");
+      } catch (ex) {
+        say(ex instanceof TypeError ? "Can't reach the community right now. Check your connection and try again." : ex.message);
+        btn.disabled = false;
+      }
+    });
+    document.body.append(d);
+    d.showModal();
+    f.text.focus();
+  }
+  document.addEventListener("click", e => {
+    const a = e.target.closest && e.target.closest("[data-feedback]");
+    if (a) { e.preventDefault(); feedback(); }
+  });
+
   /* creator cards and other static spots that want a block head */
   for (const el of $$("[data-head-name]")) el.innerHTML = head({ name: el.dataset.headName }, 56);
 
@@ -741,6 +796,6 @@
     who, ctag, badges, userHref, clanHref, hash32,
     TERMS, termsAccepted, acceptTerms,
     push: { state: pushState, stateOf: pushStateOf, on: pushOn, off: pushOff, sync: pushSync, test: () => api("/push/test", { body: {} }), ios: IOS, standalone },
-    backTo,
+    backTo, feedback,
   };
 })();
